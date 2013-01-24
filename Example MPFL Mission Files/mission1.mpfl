@@ -1,0 +1,30 @@
+Plan booboo
+(
+	Loiter a(LoiterPosition = GeoPosition(Lat = Degrees(32.0), Lon = Degrees(-122.0), Depth = Meters(15.4)))
+
+	Search c(SonarName = sideMountArray, SearchArea = RectangularArea(TopLeft = GeoPosition(Lat = Degrees(31.5), Lon = Degrees(-122.5), Depth = Meters(0.0)),
+	                                                                  BottomRight = GeoPosition(Lat = Degrees(29.5), Lon = Degrees(-122.0), Depth = Meters(0.0))),
+	         LaneWidth = Meters(100.0))
+
+	UseAcoustic e(AcousticDevice = expPayload, StartTime = ClockTime(Day=0.0,Hour=22.0,Minute=04.0,Second=0.0,Millisecond=0.0), 
+	              EndTime = ClockTime(Day=0.0,Hour=22.0,Minute=45.0,Second=0.0,Millisecond=0.0), TaskDuration = Minutes(15.0), 
+	              MinGap = Seconds(30.0), MaxGap = Minutes(2.0))
+	
+		         
+	Transit d(Waypoints = GeoPosition(Lat = Degrees(32.0), Lon = Degrees(-122.0), Depth = Meters(15.4))
+	                      - GeoPosition(Lat = Degrees(32.0), Lon = Degrees(-121.9), Depth = Meters(3.4))
+	                      - GeoPosition(Lat = Degrees(32.0), Lon = Degrees(-121.7), Depth = Yards(1.4)))
+	                      	   
+	PhoneHome b(ModemName = whoiUModem, PhoneHomeRate = Hertz(0.1))
+		              
+	UseModem f(ModemName = whoiUModem, Message = LookupString(Get_Status_Message))
+	UseSonar g(SonarName = towedArray, PingRate = Hertz(20.0))
+	
+	Do(a & (b > c & d) > e || (f ^ g))
+)
+
+Plan main
+(
+	ExecutePlan foo(UserPlanName = booboo)
+	Do(foo)
+)

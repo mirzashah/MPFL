@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="Cpp2ML" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="libCpp2ML" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="obj/Debug/" />
+				<Option type="2" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Compiler>
+					<Add option="-Wall" />
+					<Add option="-g" />
+				</Compiler>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add directory="$(HELPERPROJECTS)/MapSystemCore" />
+			<Add directory="$(HELPERPROJECTS)/MaSUtilities" />
+			<Add directory="$(HELPERPROJECTS)/IPC" />
+			<Add directory="$(MOOS_BASEPATH)/Core" />
+			<Add directory="$(RSD_BASEPATH)/RSDIPC" />
+		</Compiler>
+		<Unit filename="ConsoleMagicML.cpp" />
+		<Unit filename="ConsoleMagicML.h" />
+		<Unit filename="FieldInterfaceML.cpp" />
+		<Unit filename="FieldInterfaceML.h" />
+		<Unit filename="MLIncludes.h" />
+		<Unit filename="Makefile" />
+		<Unit filename="MapSystemML.cpp" />
+		<Unit filename="MapSystemML.h" />
+		<Unit filename="consolemagic.ml" />
+		<Unit filename="mapsystem.ml" />
+		<Unit filename="moos.ml" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

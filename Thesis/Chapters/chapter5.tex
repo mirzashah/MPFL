@@ -1,0 +1,1067 @@
+% Chapter 5 - Master's Thesis 
+% Mirza A. Shah
+\chapter{Understanding and Utilizing MPFL}
+
+\section{Overview}
+The previous chapter depicted how the MSL allows a user to describe complex missions consisting of multiple goals and constraints in a logical manner. The MPFL compiler ensures that either each goal that is attempted meets all constraints bound to it or informs the user when constraints will be violated while giving them an opportunity to handle the problem through exception handling. Though implementing a compiler for such a language may seem difficult, the approach utilized to implement a prototype compiler was quite straightforward and simple to reason about. This chapter describes how the prototype compiler and API is implemented and how one utilizes it in their own autonomous robot. 
+
+\section{How MPFL is Meant to Be Used}
+As mentioned in Chapter 3, MPFL is not quite like compilers for typical high-level languages where the compiler is an application that takes source files as input (often in the form command line arguments) and then generates corresponding object files. Rather MPFL is a library that a client application must link against and invoke from within their application utilizing calls provided in the API (\RefPicture{MPFL_client_layers.png}). The application could encompass all the autonomy software onboard a robot or represent one module/agent in a larger system. The prototype reference implementation of MPFL is written in the \textit{OCaml} programming language and for the time being MPFL client applications must utilize an OCaml API until other bindings are written. In addition to be invoked from a client application, the MPFL compiler/runtime requires a set of plugins that define the primitive scheduling abilities as well as hooks to perception/knowledge base information to be fed to it. The way MPFL is utilized within a client application is described by the following algorithm:
+
+\InsertPicture{MPFL_client_layers.png}{0.25}{Relationship between MPFL core library and client application}
+
+\begin{enumerate}
+\item Initialize the MPFL compiler/runtime passing in path of the file containing the mission specification written in the MSL along with with a set of plug-ins via the function \Code{initialize\_mpfl}.
+\item Invoke the MPFL compiler from the client code which returns a set of \emph{schedules} via the function \Code{build\_schedules}.
+\item Use the schedules (i.e. parse and process them) to control actuators and subsystems of the robot in order to accomplish goals specified in the mission specification.
+\item Goto 2.
+\end{enumerate}
+
+\begin{flushleft}
+Unlike a typical compiler, the MPFL compiler is meant to constantly be reinvoked, hence the need for the last step in the algorithm. As a robot performs its mission, the environment around it may change causing perception information to change. For example, the compiler may generate a schedule for the navigational subsystem that assumes a clear, obstruction-free path. However as the mission progresses, sensors discover an obstacle is in the way. This means the current set of schedules is no longer valid and replanning needs to occur. Replanning is carried out by simply reinvoking the compiler and generating a new set of schedules. Due to this, the client application must constantly reinvoke the compiler (as in step 2) and issue new commands to its subsystems. One way to do this is as described in the above algorithm; reinvoke the compiler in an infinite loop ensuring the freshest set of schedules available. A smarter, less computationally-intensive MPFL client would only reinvoke the compiler when environmental information has changed to some significant degree.
+\end{flushleft}
+
+\section{The Simplified MPFL Compiler/Runtime Engine}
+The mission specification just describes what the robot is to do. It is input by the user in the form of a text file. It is up to the compiler to figure out either how to accomplish the tasks in the specification or inform the user when something cannot be done due to task infeasibilities/conflicts. The compiler's job is to take a high-level specification in the MSL and translate it to a series of low-level schedules (\RefPicture{mpflhighlevel.png}) Schedules are simply tables of timestamped commands for the low-level subsystems and actuators, such as commands for the drive system or activating a payload such as a camera or robotic arm.
+
+This section describes the core stages of the MPFL compiler while omitting some details for the sake of simplicity. The remaining details will be discussed in the next section. The MPFL compiler is broken into the following stages that are also illustrated in \RefPicture{mpfl_engine_basic.png}:
+\begin{itemize}
+\item Parser
+\item Plan Instance Tree (PIT) Builder
+\item Lifetime State Transition (LST) Evaluator
+\item Planner Invocation (PI) Evaluator
+\end{itemize}
+\InsertPicture{mpfl_engine_basic.png}{0.25}{Simplified MPFL Engine}
+
+\section{Parser}
+The \Definition{parser} for most programming language interpreters/compilers has the responsibility of reading source code and generating an internal representation of the code for subsequent interpreter/compiler stages. In other words, it transforms code specified with a \Definition{concrete syntax} (i.e. the MSL) into an abstract representation, such as an \textit{abstract syntax tree} which a computer program (the compiler/runtime) can process more easily. The MPFL parser takes the specification written in the MSL and generates a simple abstract syntax tree encompassing the entire specification. If there are syntax errors in the specification, the parser emits a description of the errors and their respective line numbers to the console resulting in the termination of the MPFL compiler/runtime.
+
+The grammar of the language is an LALR(1) grammar (a subset of \textit{context-free grammars}) for which a \textit{shift-reduce} parser was generated utilizing the OCaml equivalents of the popular \textit{lex} lexer generator and \textit{yacc} parser generator (called \textit{ocamllex} and \textit{ocamlyacc} respectively). 
+
+\subsection{Grammar Specification}
+The complete grammar specification is defined as follows using \Definition{Backus-Naur Form (BNF)} notation.
+
+\begin{verbatim}
+
+(** Main Program **)
+Program            := PlanDeclarations
+PlanDeclarations   := PlanDeclarations PlanDeclaration 
+                    | PlanDeclaration
+PlanDeclaration    := `Plan' <string> `(' PlanInstDeclarations 
+                       ConstraintDeclarations DoExpDeclaration `)' 
+                    | `Plan' <string> `(' PlanInstDeclarations
+                      ConstraintDeclarations DoExpDeclaration 
+                      InfeasibleHandler `)'
+                    | `Plan' <string> `(' PlanInstDeclarations
+                      ConstraintDeclarations DoExpDeclaration
+                      ConflictHandler `)' 
+                    | `Plan' <string> `(' PlanInstDeclarations
+                      ConstraintDeclarations DoExpDeclaration
+                      InfeasibleHandler ConflictHandler `)'          
+
+(** Error Handlers **)
+InfeasibleHandler := `OnInfeasible' `(' InfeasibleCases`)'
+ConflictHandler   := `OnConflict' `(' ConflictCases`)' 
+
+InfeasibleCases   := InfeasibleCases+
+ConflictCases     := ConflictCases+
+
+InfeasibleCase    := `Case' `(' PlanInstChain `)' `(' HandlerExp `)'
+InfeasibleCase    := `Case' `(' PlanInstChains `)' `(' HandlerExp `)'
+
+PlanInstChains    := PlanInstChain | PlanInstChain `,' PlanInstChains
+PlanInstChain     := PlanInstChain `->' <string> | <string>
+
+HandlerExp        := `Disable' `(' PlanInstChains `)'
+                   | `Retract' `(' PlanInstChains `)'
+                   | `if' `(' MPFLBool `)' then 
+                   `(' HandlerExp `)' else `(' HandlerExp `)'
+                        
+(** Primitive Types **)
+
+MPFLString        := `LookupString' `(' MPFLString `)' | <string>
+MPFLInteger       := MPFLInteger `+' MPFLIntegerTerm
+                   | MPFLInteger `-' MPFLIntegerTerm
+                   | MPFLInteger `*' MPFLIntegerTerm
+                   | MPFLInteger `/' MPFLIntegerTerm
+                   | `(' MPFLInteger `)'
+                   | MPFLIntegerTerm
+MPFLIntegerTerm   := `LookupInteger' `(' MPFLString `)' | <integer>
+
+MPFLFloat       := MPFLFloat `+' MPFLFloatTerm
+                 | MPFLFloat `-' MPFLFloatTerm
+                 | MPFLFloat `*' MPFLFloatTerm
+                 | MPFLFloat `/' MPFLFloatTerm
+                 | `(' MPFLFloat `)'
+                 | MPFLFloatTerm
+MPFLFloatTerm   := `LookupFloat' `(' MPFLString `)' | <float>
+
+MPFLBool        := `LookupBool' `(' MPFLString `)' 
+                 | <bool>
+                 | MPFLInteger `>=' MPFLInteger
+                 | MPFLInteger `>' MPFLInteger
+                 | MPFLInteger `==' MPFLInteger
+                 | MPFLInteger `<=' MPFLInteger
+                 | MPFLInteger `<' MPFLInteger
+                 | MPFLFloat `>=' MPFLFloat
+                 | MPFLFloat `>' MPFLFloat
+                 | MPFLFloat `==' MPFLFloat
+                 | MPFLFloat `<=' MPFLFloat
+                 | MPFLFloat `<' MPFLFloat
+                 | MPFLString `==' MPFLString
+                 
+(** Plan Instance Declarations **)
+PlanInstDeclarations := PlanInstDeclarations PlanInstDeclaration
+                      | PlanInstDeclaration
+
+PlanInstDeclaration := `ExecutePlan' <string> `(' ExecutePlanParams `)'
+                     | `Loiter' <string> `(' LoiterParams `)'
+                     | `PhoneHome' <string> `(' PhoneHomeParams `)'
+                     | `Search' <string> `(' SearchParams `)'
+                     | `Transit' <string> `(' TransitParams `)'
+                     | `UseAcoustic' <string> `(' UseAcousticParams `)'
+                     | `UseAutopilot' <string> `(' UseAutopilotParams `)'
+                     | `UseModem' <string> `(' UseModemParams `)'
+                     | `UseSonar' <string> `(' UseSonarParams `)'                                          
+                     
+ExecutePlanParams  :=  `UserPlanName' `=' <string>
+
+LoiterParams       := `LoiterPosition' `=' Position
+ 
+PhoneHomeParams    := `ModemName' `=' MPFLString `,' `PhoneHomeRate' 
+                      `=' Frequency
+ 
+SearchParams       := `SonarName' `=' MPFLString `,' `SearchArea'  
+                      `=' Area `,'  `LaneWidthToken' `=' Length
+
+TransitParams      := `Waypoints' `=' Positions
+
+UseAcousticParams  := `AcousticDevice' `=' MPFLString `,' StartTime `=' Time `,'
+                      `EndTime' `=' Time `,' TaskDuration `=' Duration `,'
+                      `MinGap' `=' Duration `,' `MaxGap' `=' Duration
+
+UseAutopilotParams := `Destination' `=' Position
+
+
+UseModemParam      := `ModemName' `=' MPFLString `,' `Message' `=' MPFLString
+
+UseSonarParams     := `SonarName' `=' MPFLString `,' `PingRate' `=' Frequency
+
+(** Constraint Declarations **)
+ConstraintDeclarations := ConstraintDeclaration+
+
+ConstraintDeclaration  := `TimeConstraint' <string> `(' TimeConstraintParams `)'
+                        | `PowerConstraint' <string> `(' PowerConstraintParams `)'
+
+TimeConstraintParams   := Time `<=' `StartTime' `<=' Time `,' 
+                          Time `<=' `EndTime' `<=' Time
+
+PowerConstraintParams  := `MaxLoad' `=' Power `,' `MaxEnergy' `=' Energy
+
+(** Do Expression Declaration **)
+
+DoExpDeclaration : `Do' `(' PlanExp `)'
+
+PlanExp := PlanExp `>' PlanTerm
+         | PlanExp `||' PlanTerm
+         | PlanExp `&' PlanTerm
+         | PlanExp `^' PlanTerm
+         | PlanExp `with' PlanTerm                  
+         | `if' `(' MPFLBool `)' `then' `(' PlanExp `)'
+           `else' `(' PlanExp `)'
+         | PlanTerm
+
+PlanTerm := `(' PlanExp `)' | <string>          
+
+(** Composite Primitive Types **)
+Angle := `Degrees' `(' MPFLFloat `)' | `Radians' `(' MPFLFloat `)' 
+
+Duration := `Seconds' `(' MPFLFloat `)'
+          | `Minutes' `(' MPFLFloat `)'
+          | `Hours' `(' MPFLFloat `)'
+
+Length := `Meters' `(' MPFLFloat `)' | `Feet' `(' MPFLFloat `)'
+        | `Yards' `(' MPFLFloat `)'
+
+Frequency := `Hertz' `(' MPFLFloat `)'
+
+Power := `Watts' `(' MPFLFloat `)'
+       | `Horsepower' `(' MPFLFloat `)'
+
+Energy := `Joules' `(' MPFLFloat `)'
+        | `KilowattHours' `(' MPFLFloat `)'
+;
+
+(** Positional Types **)
+Positions         := Positions `-' Position | Position
+Position          := AbsolutePosition | RelativePosition
+
+AbsolutePosition  := `GeoPosition' `(' `Lat' `=' Angle `,' 
+                     `Lon' `=' Angle `,' `Depth' `=' Length `)'
+
+CartesianPosition := `CartesianPosition' `(' `X' `=' Length `,' `Y'
+                     `=' Length `,' `Z' `=' Length `)'
+
+RelativePosition  := `RelativePosition' `(' `Center' `=' AbsolutePosition
+                     `,' `Offset' `=' CartesianPosition `)'
+
+
+(** Area Types **)
+Area            := RectangularArea | CircularArea
+
+RectangularArea := `RectangularArea' `(' TopLeftToken `=' 
+                   Position `,' BottomRightToken `=' Position `)' 
+
+CircularArea    := `CircularArea' `(' `Center' `='
+                   Position `,' RadiusToken `=' Length `)'
+
+(** Time Types **)
+Time      := ClockTime | UnixTime
+ClockTime := `ClockTime' `(' `Days' `=' MPFLInteger `,'
+             `Time' `=' MPFLInteger `::' MPFLInteger `::' MPFLInteger `)'
+
+UnixTime  := `UnixTime' `(' `UTCSeconds' `=' MPFLInteger `)' 
+\end{verbatim}
+
+\subsection{Syntactic Enforcement of Types}
+One interesting aspect of the design of the MSL grammar was encoding a big chunk of the type system as production rules within the grammar itself. Most of the typed constructs from the last chapter are encoded as production rules in the grammar. This means that when one utilizes a value of the wrong type for a typed parameter, it results often in a \emph{syntax error} rather than a \emph{semantic error}. If we look at the classical compiler pipeline for a programming language, parsing is encompassed within the lexical analysis and syntactic analysis stages whereas the majority of type checking is encompassed within the subsequent semantic analysis stage. The reason MPFL can get away with this is because the syntax of the MSL is so limited compared to that of a general-purpose language: the order of parameters in constructors is fixed, plan instances must be declared before constraints, constraints must be declared before the Do Expression, the Do Expression must be declared before the handlers. This strict ordering is easy to implement in a context-free grammar. As a parser generator was used, it was easier to enforce many of the type rules during parsing rather than in the semantic analysis stage, hence the design. Regardless, the result is the same to the end user.
+
+\section{Plan Instance Tree (PIT) Builder} \LabelSection{pitbuilder}
+The output of the parser is a simple abstract tree representation of the mission as specified in the MSL. Rather than being encoded now as mere text, the specification is stored in the form of a traversable data structure that can be used by the next stage of MPFL compiler/runtime: the \Definition{Plan Instance Tree (PIT) Builder}.
+
+The PIT Builder has two responsibilities:
+\begin{itemize}
+\item Verify and enforce static semantics that parsing stage could not handle.
+\item Build an intermediate representation in the form of a \emph{plan instance tree} (the same concept as from Chapter 4) used for subsequent engine stages.
+\end{itemize}
+
+\subsection{Static Semantics}
+As mentioned earlier, many of the type rules of the language are enforced syntactically via the parser. However, there are other static semantics of the language that are not handled when parsing. This is because an LALR(1) grammar is not sufficiently powerful enough due to the context sensitivity of the remaining static semantics:
+\begin{itemize}
+\item \textit{Reference scoping rules} - In the MSL, references are used for values in the language, such as the names of plan instances and constraints within a Do Expression, the plan instance chains in infeasibility and conflict handler cases, and the names of user-defined plans referenced in the constructors of \Code{ExecutePlan} plan instances. The PIT builder checks the validity of references by makes sure they refer to values actually declared within the scope of the user-defined plan where they are used.
+\item \textit{Literal value ranging checking} - Values which are literal values (i.e. explicitly stated in the code and not \Code{Lookup*} calls) have their range checked by the PIT Builder. For example, when values of type \Type{Angle} are used to specify geographical coordinates (latitude/longitude), when specified using the \Code{Degrees} constructor, the range of the latitude must be between -90.0 and 90.0 and the longitude must be between -180.0 and 180.0. Likewise if \Code{Radians} are used, latitude must be between $-\pi/2$ and $\pi/2$ and longitude must be between $-\pi$ and $\pi$.
+\item \textit{Lookup key checking} - The keys used within \Code{Lookup*} calls are defined through the plug-ins passed by the client application to MPFL during initialization. Before compiling, the PIT Builder making sure keys used in \Code{Lookup*} calls in the mission specification exist by performing test lookups on all those key values.
+\item \textit{Additional type rules} - Certain static type rules could not be enforced in the grammar so the PIT Builder contains additional logic to enforce the remainder.
+\end{itemize}
+
+\subsection{Intermediate Representation - Plan Instance Tree}
+The static semantics are enforced as the PIT Builder builds an intermediate representation (a different abstract syntax) to be used for subsequent MPFL engine stages. This intermediate representation comes in the form of a \textit{plan instance tree}. Recall in the last chapter, the plan instances specified in the mission specification form a tree structure called the plan instance tree. The root of this tree is called the \emph{sortie plan instance} with identifier \emph{sortie}. The sortie instance is an instance of the last user-defined plan in the mission specification.
+
+To reason about the static and runtime semantics of the MSL and how MPFL works, we define the abstract syntax in the form of a grammar. This grammar is described as a set of variant type definitions in the OCaml language which was used as the metalanguage to implement MPFL. This notation not only specifies the abstract syntax but it also encodes aspects of the type system. The syntax of variant types in OCaml is quite simple to understand and closely resembles the form of BNF production rules used earlier to specify the MSL grammar. The OCaml syntax for a variant type is as follows:
+
+\begin{verbatim}
+type <identifier> = valueConstructor1 | ... | valueConstructorN
+\end{verbatim}
+
+Each possible value the variant type can take is separated by vertical bars and is defined by a constructor. A constructor is simply a string identifier (in OCaml it must start with an uppercase later) followed by a tuple of arguments enclosed in parentheses that encode the value. The constructor does not necessarily have to take arguments in which case it is simply works as an enumeration.
+Constructors have the following syntax:
+\begin{verbatim}
+<constructor identifier> of (type1 * type2 * ... * typeN)
+\end{verbatim}
+
+A complete example of a variant type is as follows. For example:
+\begin{verbatim}
+type point = Point of float*float;;
+type shape = Circle of float | Rectangle of point*float*float;;
+
+let myCircle = Circle(4.5);;
+let mySquare = Rectangle(Point(0,0), 40.0,40.0);;
+\end{verbatim}
+\CodeCaption{1}{Defining variant types in OCaml}\\
+\begin{flushleft}
+In OCaml, the variables \Code{myCircle} and \Code{mySquare} would both have type \Type{shape}.
+\end{flushleft}
+The types used in constructors can be recursive meaning that the type that is being declared on the left-hand side can be used as a constructor argument. The use of asterisks \Code{(*)} refers to \Definition{tuple types} in OCaml. The arguments to constructors in OCaml constructors are actually a single argument of a tuple type. Tuple values are enclosed within parentheses with arguments separated by commas. In addition to variant types, OCaml allows defining \Definition{record types} which are similar to a tuple, but each argument has to be named. Values of record types are enclosed within curly braces rather than parentheses like tuples and parameters are separated by semicolons instead of commas.
+
+The abstract syntax specification for MPFL is given with the following OCaml code:
+
+\begin{verbatim}
+(**Basic [atomic] types**)
+type mpflString           = String of string | LookupString of mpflString;;
+type mpflInteger          = Integer of int | LookupInteger of mpflString 
+                            | AddInt of mpflInteger * mpflInteger 
+                            | SubInt of mpflInteger * mpflInteger 
+                            | MultInt of mpflInteger * mpflInteger
+                            | DivInt of mpflInteger * mpflInteger;;
+type mpflFloat            = Float of float | LookupFloat of mpflString 
+                            | AddFloat of mpflFloat * mpflFloat 
+                            | SubFloat of mpflFloat * mpflFloat
+                            | MultFloat of mpflFloat * mpflFloat 
+                            | DivFloat of mpflFloat * mpflFloat;;
+type mpflBool             = Bool of bool | LookupBool of mpflString 
+                            | StrEqual of mpflString * mpflString 
+                            | NegateBool of mpflBool 
+                            | IntGTE of mpflInteger * mpflInteger 
+                            | IntGT of mpflInteger * mpflInteger 
+                            | IntEQ of mpflInteger * mpflInteger 
+                            | IntLT of mpflInteger * mpflInteger 
+                            | IntLTE of mpflInteger * mpflInteger
+                            | FloatGTE of mpflFloat * mpflFloat 
+                            | FloatGT of mpflFloat * mpflFloat 
+                            | FloatEQ of mpflFloat * mpflFloat 
+                            | FloatLT of mpflFloat * mpflFloat 
+                            | FloatLTE of mpflFloat * mpflFloat;;                             
+                                                        
+type angle                = Degrees of mpflFloat | Radians of mpflFloat;;
+type duration             = Seconds of mpflFloat | Minutes of mpflFloat 
+                            | Hours of mpflFloat;;
+type length               = Meters of mpflFloat | Feet of mpflFloat 
+                            | Yards of mpflFloat;;
+type frequency            = Hertz of mpflFloat;;
+type power                = Watts of mpflFloat | Horsepower of mpflFloat;;
+type energy               = Joules of mpflFloat | KilowattHours of mpflFloat;;
+ 
+(**Positional types**)
+type absolutePosition     = {lat:angle; lon:angle; depth:length};;
+type cartesianPosition    = {x:length; y:length; z:length};;
+type relativePosition     = {center:absolutePosition; offset:cartesianPosition};;
+type position             = AbsolutePosition of absolutePosition 
+                            | CartesianPosition of cartesianPosition 
+                            | RelativePosition of relativePosition;;
+
+(**Area types**)
+type rectangularArea      = {tl:position; br:position};;
+type circularArea         = {centerOfArea: position; radius: length};;
+type area                 = RectangularArea of rectangularArea 
+                           | CircularArea of circularArea;;
+                           
+(**Time types**)
+type clockTime            = {day:mpflInteger; hour:mpflInteger; minute:mpflInteger;
+                            second:mpflInteger};;
+type unixTime             = {utcSeconds:mpflInteger};;
+type time                 = ClockTime of clockTime | UnixTime of unixTime;;
+type timeWindow           = {beginTime:time; finishTime:time};;
+
+(** Constraint types**)
+type timeConstraint       = {startWindow : timeWindow; endWindow : timeWindow};;
+type powerConstraint      = {maxPowerLevel : power; maxEnergyToUse : energy};;
+type constraintImp        = TimeConstraint of (string * timeConstraint) 
+                            | PowerConstraint of (string * powerConstraint);;
+
+(** Different primitive plan instance task types **)
+type executeUserProblem    = {userPlanName:string};;
+type loiterProblem         = {loiterPosition:position};;
+type phoneHomeProblem      = {commDeviceName:string; phoneHomeRate:frequency};;
+type searchProblem         = {searchSonarName:string; searchArea:area;
+                              laneWidth:length};;
+type transitProblem        = {waypoints:position list};;
+type useAcousticProblem    = {acousticDeviceName:string; startTime:time;
+                              endTime:time; taskDuration:duration;
+                              minGap:duration; maxGap:duration};;
+type useAutopilotProblem   = {destination:position};;
+type useModemProblem       = {modemName:string; modemMessage:mpflString};;
+type useSonarProblem       = {sonarName:string; pingRate:frequency};;
+ 
+type problem               = ExecutePlan of executeUserProblem 
+                             | Loiter of loiterProblem 
+                             | PhoneHome of phoneHomeProblem 
+                             | Search of searchProblem 
+                             | Transit of transitProblem 
+                             | UseAcoustic of useAcousticProblem 
+                             |  UseAutopilot of useAutopilotProblem 
+                             | UseModem of useModemProblem
+                             | UseSonar of useSonarProblem;;
+
+(** Lifetime states **)
+type offState             = INIT | DISABLE | SYS_RETRACT | BLOCK;;
+type onState              = READY | RUN | FORCE_RUN;;
+type endState             = RETRACT | COMPLETE;;
+type ltState              = On of onState | Off of offState | End of endState;; 
+
+(** Error handlers**)
+type planInstChain        = string list;;
+type handlerExp           = Disable of planInstChain list 
+                            | Retract of planInstChain list 
+                            | HandlerIfThenElse of (mpflBool * handlerExp
+                                                    * handlerExp);;
+type infeasibleCase       = InfeasibleCase of planInstChain * handlerExp;;
+type conflictCase         = ConflictCase of planInstChain list * handlerExp;;
+type infeasibleHandler    = InfeasibleHandler of infeasibleCase list;;  
+type conflictHandler      = ConflictHandler of conflictCase list;;
+
+(** Plan Instance Tree (PIT) (DoExpression and PlanExpression) **)
+type opType               = SERIAL | PARALLEL | GROUP | XOR;;
+type planExp              = PlanInst of string * ltState * doExp
+                                        * problem * constraintImp list
+                                        * infeasibleHandler 
+                                        * conflictHandler 
+                            | Op of opType * planExp * planExp 
+                            | IfThenElse of (mpflBool * planExp * planExp)
+and doExp                 = NIL | Do of planExp;;
+\end{verbatim}
+
+The \Code{PlanInst} constructor has type \Type{planExp}. A \Code{PlanInst} constructor represents a plan instance and any children it may have. This constructor is used to define the plan instance tree the PIT Builder generates. The entire plan instance tree is encoded as a single \Code{PlanInst} value representing the \emph{sortie} plan instance. Each \Code{PlanInst} value contains within it the name of the instance, the plan type with plan constructor, constraints bound to the plan instance, a Do Expression, infeasibility handler, conflict handler, and other contextual information. The Do Expression itself is also of type \Type{planExp} and can represent another plan instance, conditional expression, or planning operator. In user-defined plan instances, the Do Expression is where children nodes are encoded which is the means to building the tree. Primitive plan instances are leaves so their Do Expressions are empty (i.e. \Code{NIL}). Plan instances which are instances of user-defined plans (such as the sortie instance) have non-empty infeasibility and conflict handlers if those handlers are defined within their corresponding user-defined plan.
+
+\subsection{Formal Specification of Type Rules}
+It was mentioned that the reason the abstract syntax is specified in OCaml is because it implicitly also defines the majority of the MSL \Definition{type system}. All of the variant types used in the metalanguage (OCaml) map almost exactly to the types in the MSL. It is a common practice for language implementors to map the types of the language they are implementing as closely as possible to native types in the metalanguage. This makes it easier for the implementor as they do not have to write the logic to enforce the type rules as the metalanguage's compiler already handles it. 
+
+In the study of programming languages, these rules tend to be formally specified using \Definition{inference rules}, which are logical statements denoting antecedent (i.e. premise) and conclusion pairs. Take for example the type \Type{mpflInteger}:
+\begin{verbatim}
+type mpflInteger          = Integer of int | LookupInteger of mpflString 
+                            | AddInt of mpflInteger * mpflInteger 
+                            | SubInt of mpflInteger * mpflInteger 
+                            | MultInt of mpflInteger * mpflInteger
+                            | DivInt of mpflInteger * mpflInteger;;
+\end{verbatim}
+
+\begin{flushleft}
+We can encode this using the following set of inference rules:
+\end{flushleft}
+
+$$
+\infer[\nextruleid]{Integer(v):mpflInteger}{v:\overline{int}}
+\qquad
+\infer[\nextruleid]{LookupInteger(e):mpflInteger}{e:mpflString}
+$$
+
+$$
+\infer[\nextruleid]{AddInt(e1,e2):mpflInteger}{e1:mpflInteger & e2:mpflInteger}
+\qquad
+\infer[\nextruleid]{SubInt(e1,e2):mpflInteger}{e1:mpflInteger & e2:mpflInteger}
+$$
+
+$$
+\infer[\nextruleid]{MultInt(e1,e2):mpflInteger}{e1:mpflInteger & e2:mpflInteger}
+\qquad
+\infer[\nextruleid]{DivInt(e1,e2):mpflInteger}{e1:mpflInteger & e2:mpflInteger}
+$$
+
+The rules fully specify the integer type in the language. Each rule states that if the antecedent (the statements on the top of the bar) can be proven true, then the conclusion (the statements on the bottom of the bar) can be considered true. Rule 1 specifies literal integer values, rule 2 specifies the \Code{LookupInteger} function, and rules 3 to 6 specify basic arithmetic expressions. Specifying type rules in this manner can be useful when formally proving properties about the language, particularly its runtime semantics.\footnote{The type rules do not utilize a \textit{type environment}, commonly denoted as $\Gamma$ in programming language literature. Type environments are used to resolve the types of free variables in the language. In the MSL, a type environment is not needed as there are no free variables and types can be determined syntactically.} It is not necessary to specify the remainder of the type rules above as they can easily be derived using the \Type{mpflInteger} example.
+
+\subsection{Formal Specification of Run-time Type Rules} \LabelSection{formalstaticsem}
+The OCaml variant types define the static semantics of the system, but there are aspects of the type constraints that cannot be verified at compile time. This requires runtime checks by the MPFL runtime in order to verify the validity of the mission specification. We can add additional rules and enhance the type rules implied by the OCaml abstract syntax to handle those semantics. However, these rules are different from the previous inference rules as they are runtime rules and require invoking a \Definition{runtime evaluator}. For example, it was mentioned that the latitude and longitude for values representing geographical positions (represented by record type \Type{absolutePosition} in the abstract syntax) have type \Type{angle}. However their value must fall additionally within a particular range depending on whether the value was specified using the \Code{Degrees} constructor or the \Code{Radians} constructor. We can specify these checks as runtime rules using a semantics model called \Definition{operational semantics}. Operational semantics are a means of formally specifying the meaning of a program\footnote{Operational semantics are only one type of runtime semantics model. Other popular semantic models include \emph{axiomatic semantics} and \emph{denotational semantics}.} as it is executed. In other words, the operational semantics describe how an evaluator (i.e. interpreter) for a language operates as it encounters expressions defined in terms of the abstract syntax. The runtime type checking semantics of an \Type{absolutePosition} value are specified by the following rules:
+
+$$
+\infer[\nextruleid]{ValidLatitude(e)}{e \ValueEval  Degrees(Float(v)), -90 \leq v \leq 90}
+$$
+
+$$
+\infer[\nextruleid]{ValidLatitude(e)}{e \ValueEval  Radians(Float(v)), -\pi/2 \leq v \leq \pi/2}
+$$
+
+$$
+\infer[\nextruleid]{ValidLongitude(e)}{e \ValueEval  Degrees(Float(v)), -180 \leq v \leq 180}
+$$
+
+$$
+\infer[\nextruleid]{ValidLongitude(e)}{e \ValueEval  Radians(Float(v)), -\pi \leq v \leq \pi}
+$$
+
+$$
+\infer[\nextruleid]{ValidAbsolutePosition(\{lat = e1; lon = e2; depth = e3\})}{ValidLatitude(e1) & ValidLongitude(e2)}
+$$
+
+In rules 7 to 11, we specify \Definition{properties} that we would like certain expressions to have (\textit{ValidLatitude, ValidLongitude, ValidAbsolutePosition}). These properties are metaconstructs used by the MPFL compiler/runtime to ensure validity of typed expressions. Whenever these values are used, we can ensure that those values meet their range constraints (or any other constraints) by having one of these \textit{Valid*} properties. In other words, the MPFL compiler/runtime ensures that the \textit{Valid*} property exists for each value specified checked right before its usage. Note that expressions that hold the \textit{Valid*} property during an MPFL compilation cycle may not hold the property later on (e.g. \Code{Lookup*} call) causing a runtime error. As an example, rule 11 states an expression of type \Type{absolutePosition} is valid when its latitude and longitude subexpressions have the \textit{ValidLatitude} and \textit{ValidLongitude} properties respectively. These in turn are expressed in rules 7 through 10. Each of these rules call an \Definition{evaluator} (the arrow) that reduces a typed expression to a value representing each angle to its \Definition{reduced form}\footnote{The type of operational semantics used here are \emph{big-step operational semantics}. The antecedents in each rule always assume that the expression reduces to its simplest possible form in a single `big step'.} (i.e. simplest form): a \Code{Degrees} or \Code{Radians} constructor following by a floating-point value. If the value falls within the correct range, the respective property holds. If these properties do not hold, it means a runtime type error causing the MPFL runtime to raise an exception.
+
+Notice that the arrow representing the evaluator has the word \emph{Value} subscripted on it. MPFL has multiple evaluators that are used to express its complete runtime semantics. In this case, \emph{Value} refers to the \Definition{Value Evaluator}. This evaluator can take any typed expression in the language and return a version of it where all primitive typed (boolean, integer, float, and string) expressions have been reduced to their simplest values. For example, \Code{AddInt(Integer(3),AddInt(Integer(4),Integer(2)))} would evaluate to \Code{Integer(9)} with the Value Evaluator. The Value Evaluator is discussed in more detail later in the chapter when the remainder of runtime rules are described.
+
+The remainder of runtime type checks are ignored due to the sheer quantity of rules. However, Rules 7-11 demonstrate how the remaining runtime checks could be described in a more formal manner.
+
+\subsection{The Next Step}
+The output of the PIT Builder is a well-formed plan instance tree where all static semantics have been verified. The Parser and PIT Builder are no longer needed after this point and are never called again. In fact, the Parser and PIT Builder are only called when the user initializes the MPFL compiler/runtime within their client application. Initialization will fail if there are syntactic or type errors and return to the user a list of errors with corresponding line numbers. After the plan instance tree is created, the actual compilation of schedules begins. The subsequent MPFL engine stages are responsible for this and utilize the generated plan instance tree to do so. 
+
+\section{Lifetime State Transition (LST) Evaluator}
+The plan instance tree is more than just a representation of what the user wants the robot to do and the various parameters, constraints, and error handlers they specified in their mission specification. Rather each plan instance in the tree represents a \textit{runtime context} used by MPFL for managing each task the user wants to perform from beginning to end. \RefPicture{planinstanceiscontext.png} illustrates the kind of information that is contained in a particular plan instance in some arbritrary plan instance tree. Plan instances are analogous to process control blocks (PCBs) for operating system processes, as described in Chapter 2. Just as PCBs hold the runtime context of the respective processes they represent, plan instances are also in-memory structures that are used by MPFL to manage tasks. MPFL manages tasks through plan instances the way an operating system scheduler manages processes through PCBs.
+
+\InsertPicture{planinstanceiscontext.png}{0.25}{Each node in the plan instance tree is a context for a task}
+
+\subsection{Lifetime State}
+The MPFL runtime borrows the idea of \textit{process states} from operating system scheduler implementations to help it manage all the tasks it is to plan. In Chapter 2, it was mentioned that the scheduler of an operating system associates a state for each process (typically contained within the PCB itself) that indicates the status of the process. A process goes through many states in its existence: it can be in a state where it has just been created (INIT), it can be on the ready queue of the OS scheduler waiting to be executed (READY), it can be actually running on a processor (RUNNING), it can be paused as it is waiting for some I/O operation (BLOCKED), and it can be in its end state waiting to have its PCB destroyed and relinquished by the OS (TERMINATE). 
+
+Each plan instance also maintains a similar state known as the \Definition{lifetime state}. Each lifetime state is defined by a \emph{macrostate} and a \emph{microstate}. Each plan instance can be in one of three macrostates: \emph{Off}, \emph{On}, or \emph{End}.
+\begin{itemize}
+\item \textit{Off} - The task(s) represented by the plan instance is not currently being executed
+\item \textit{On} - The task(s) represented by the plan instance is either being executed or is ready to be executed
+\item \textit{End} - The task(s) represented by the plan instance have been terminated.
+\end{itemize}
+
+Each of these macrostates contains a microstate within that gives more detail about the nature of the macrostate. These are described in \RefTable{lifetimeStates}. \RefPicture{ltstate} shows the transitions that the lifetime state can take.
+
+\InsertPicture{ltstate}{0.15}{State transition diagram of lifetime state at macrolevel}
+
+\begin{table}[htpd]
+\centering
+\begin{tabular}{|p{2cm}|p{3cm}|p{8cm}|}
+\hline \textbf{Macrostate} & \textbf{Microstate} & \textbf{Meaning} \\
+\hline \Code{Off} & \Code{INIT} & The task is in initial state\\
+\hline \Code{Off} & \Code{DISABLE} & The task has been temporarily removed from consideration for planning\\
+\hline \Code{Off} & \Code{SYS\_RETRACT} & The task is not considered for planning, but may go into an active state later\\
+\hline \Code{Off} & \Code{BLOCK} & The task is waiting for another task(s) to complete before it can be scheduled\\\hline
+\hline \Code{On} & \Code{READY} & The task is ready to be scheduled\\
+\hline \Code{On} & \Code{RUN} & The task is currently running\\
+\hline \Code{On} & \Code{FORCE\_RUN} & The task needs to run immediately\\\hline
+\hline \Code{End} & \Code{COMPLETE} & The task successfully completed\\
+\hline \Code{End} & \Code{RETRACT} & The task was not completed and permanently removed from consideration for planning\\
+\hline 
+\end{tabular} 
+\caption{Meaning of lifetime states in MPFL} \label{tbl:lifetimeStates}
+\end{table}                                               
+
+\subsection{Usage of Lifetime State and the MPFL Model of Planning}
+The lifetime state is the key to implementing MPFL's \Definition{model of planning}. By model of planning we mean the logic that MPFL uses to plan and manage tasks in order to achieve goals without violating constraints. When a user writes a mission specification in the MSL, they expect the robot to do exactly what is specified in their program. The MPFL compiler/runtime utilizes the lifetime state to enforce this. The lifetime state is primarily manipulated by the \Definition{Lifetime State Transition (LST) Evaluator} which is a module that follows the PIT Builder in the MPFL engine. This module manipulates the lifetime states in a way that enforces MPFL's model of planning.
+
+\subsection{The Lifetime State Transition Evaluator}
+The LST Evaluator has the responsibility of changing the lifetime state of plan instances in a way that helps the MPFL runtime enforce the semantics of the language, particularly the planning operators, by providing metainformation about the tasks that are to be executed. This metainformation is also used in the next MPFL compiler stage (described later in \RefSection{pievaluator}) in order to perform scheduling.
+
+The LST Evaluator has the ability to take the plan instance tree, or any subtree within it, and attempt to \emph{apply} a lifetime state to it. By \textit{apply} it is meant that the LST Evaluator attempts to transition as many plan instances in the tree to the specified state. The MPFL runtime always holds on to the plan instance tree in the form of an expression of the aforementioned type \Type{planExp}. The LST Evaluator is simply a function that takes a value of type \Type{planExp} and a lifetime state (defined as OCaml variant type \Type{ltState}) to be applied and returns a new version of the \Type{planExp} expression where the lifetime states of each plan instance has potentially been changed. We can refer to the LST Evaluator function as \Code{LST} with the following type signature\footnote{All function type notations in this thesis use \textit{curried} notation. There is no technical reason for this use but rather stems from the use of OCaml as the implementation language where all function types are presented to the programmer in curried form.}:
+\begin{center}
+\Code{LST} : planExp $\rightarrow$ ltState $\rightarrow$ planExp
+\end{center}
+
+The MPFL runtime invokes the LST Evaluator passing in the \emph{sortie} plan instance in the form of a \Type{planExp} and applies the particular state \Code{On(READY)} meaning a lifetime state where the macrostate is \Code{On} and the microstate is \Code{READY}. The goal of the LST Evaluator is to get as many plan instances into a ready state as possible so that they can be scheduled. However, not all plan instances will transition to the \Code{On(READY)} state because it would violate the semantics of the language.
+
+\subsection{LST Transition Rules}
+The LST Evaluator encompasses over 600 rules that define how the lifetime state of the plan instances in a plan instance tree are manipulated. The choice of rule is decided exclusively by what the current lifetime state of each plan instance is and the operators used within each Do Expression. To give a gentle introduction, let us take a hypothetical example with the following MSL code that utilizes a serial operator:
+
+\begin{verbatim}
+Plan ltDemo
+(
+   Transit a(...)
+   Loiter b(...)
+   Do(a > b)
+)
+\end{verbatim}
+\CodeCaption{1}{A simple plan to demonstrate lifetime states}
+
+\InsertPicture{ltdemooninit.png}{0.25}{A freshly created plan instance tree representing Example 1}
+
+Given this specification in Example 1, the PIT Builder will emit a plan instance tree that is graphically depicted in \RefPicture{ltdemooninit.png}. In the figure, each plan instance is denoted by its name and current lifetime state. On startup, each instance is initialized in the \Code{Off(INIT)} state. If we were to pass this tree to the LST Evaluator and apply the state \Code{On(READY)} the LST Evaluator would return a tree as depicted in \RefPicture{ltdemoafterlst.png}.
+
+\InsertPicture{ltdemoafterlst.png}{0.25}{The plan instance tree from \RefPicture{ltdemooninit.png} after the LST Evaluator applies an \Code{On(READY)} state to it}
+
+The tree depicted in \RefPicture{ltdemoafterlst.png} shows that the lifetime state of each plan instance has changed. \Code{sortie} and \Code{sortie$\rightarrow$a} have gone into the \Code{On(READY)} state and \Code{sortie{$\rightarrow$}b} has gone into the \Code{Off(BLOCK)} state. The reason that this happened is because of the meaning of the serial (\Code{$>$}) operator; nothing on the right hand side can be attempted until everything on the left hand side has completed. By assigning a blocked state to \Code{sortie{$\rightarrow$}b}, MPFL can ensure that the task represented by \Code{sortie{$\rightarrow$}b} is not attempted before \Code{sortie{$\rightarrow$}a} terminates. Also note that plan instance \emph{sortie} has a lifetime state of \Code{On(READY)}. The lifetime state of a user-defined plan instance represents an \emph{overall lifetime state} of its children, which is also determined by the planning operators used in the instance's Do Expression and the current lifetime state of each child instance.
+
+Every compilation cycle, the MPFL runtime uses the LST Evaluator to apply the \Code{On(READY)} state to the sortie plan instance. The evaluator returns a new copy of the plan instance tree with the lifetime state of the plan instances potentially changed. The runtime throws away the old tree and replaces it with the new one. From an imperative perspective, the LST Evaluator is producing side-effects on the plan instance tree. However, as a functional approach was used this metaphor will not be used. The reason to think of MPFL in a functional sense is not only because the metalanguage (OCaml) is functional, but because it is easier to reason about the semantics due to the difficulty of modeling side-effects in known semantic models.
+
+\subsection{Formal Semantics of LST Evaluator}
+There are over 600 rules that describe how the LST Evaluator shifts the lifetime state of the plan instances it processes. The overall evaluator (\Code{LST}) utilizes additional evaluators which in turn utilize each other.  Each evaluator can be represented as a typed function described as followed:
+\begin{itemize}
+\item \textbf{\Code{Value : $\alpha \rightarrow \alpha$}} - This evaluator takes any typed expression in the language and returns the expression where any subexpressions that have a primitive type (i.e. \Type{mpflInteger}, \Type{mpflString}, \Type{mpflBoolean}, \Type{mpflFloat}) are evaluated and reduced to a single value. This evaluator was briefly mentioned earlier in \RefSection{formalstaticsem}.
+\item \textbf{\Code{ChangeOnState : planExp $\rightarrow$ ltState $\rightarrow$ planExp}} - This evaluator is used when plan instances are being switched to an \Code{On(*)} state. The LST evaluator is not allowed to change certain states to the \Code{On} state, so this evaluator enforces that.
+\item \textbf{\Code{CurrentGroup : ltState $\rightarrow$ ltState $\rightarrow$ ltState}} - This evaluator is used to determine the overall lifetime state of two expressions bound by a group operator based on their respective lifetime states.
+\item \textbf{\Code{CurrentParallel : ltState $\rightarrow$ ltState $\rightarrow$ ltState}} - This evaluator is used to determine the overall lifetime state of two expressions bound by a parallel operator based on their respective lifetime states.
+\item \textbf{\Code{CurrentSerial : ltState $\rightarrow$ ltState $\rightarrow$ ltState}} - This evaluator is used to determine the overall lifetime state of two expressions bound by a serial operator based on their respective lifetime states.
+\item \textbf{\Code{CurrentXor : ltState $\rightarrow$ ltState $\rightarrow$ ltState}} - This evaluator is used to determine the overall lifetime state of two expressions bound by an xor operator based on their respective lifetime states.
+\item \textbf{\Code{Current : planExp $\rightarrow$ ltState}} - This gives us the current overall lifetime state of a \Type{planExp}. Not only do plan instances have a current lifetime state, but all expressions of type \Type{planExp} have an overall current lifetime state determined by the current lifetime state of each plan instance contained within the expression along with any planning operators used.
+\item \textbf{\Code{NextGroup : planExp $\rightarrow$ planExp $\rightarrow$ ltState $\rightarrow$ (ltState * ltState)}} - This evaluator takes two \Type{planExp} bound by the group operator and a lifetime state that is to be applied that expression, and returns a lifetime state to apply to each subexpression based on the semantics of the group operator.
+\item \textbf{\Code{NextParallel : planExp $\rightarrow$ planExp $\rightarrow$ ltState $\rightarrow$ (ltState * ltState)}} - This evaluator takes two \Type{planExp} expressions bound by the parallel operator and a lifetime state that is to be applied to that expression, and returns a lifetime state to apply to each subexpression based on the semantics of the parallel operator.
+\item \textbf{\Code{NextSerial : planExp $\rightarrow$ planExp $\rightarrow$ ltState $\rightarrow$ (ltState * ltState)}} - This evaluator takes two \Type{planExp} expressions bound by the serial operator and a lifetime state that is to be applied to that expression, and returns a lifetime state to apply to each subexpression based on the semantics of the serial operator.
+\item \textbf{\Code{NextXor : planExp $\rightarrow$ planExp $\rightarrow$ ltState $\rightarrow$ (ltState * ltState)}} - This evaluator takes two \Type{planExp} expressions bound by the xor operator and a lifetime state that is to be applied to that expression, and returns a lifetime state to apply to each subexpression based on the semantics of the xor operator.
+\item \textbf{\Code{LST : planExp $\rightarrow$ ltState $\rightarrow$ planExp}} - This is the evaluator that represents the entire LST Evaluator. It takes a \Type{planExp} expression, a lifetime state to apply to the expression and in turn returns an updated plan expression with new lifetime states.
+\end{itemize}
+
+We can describe the \Definition{runtime semantics} of the LST Evaluator as a series of inference rules that utilize the other evaluators. The other evaluators can similarly be described using inference rules. Unlike the static semantics in \RefSection{pitbuilder}, these rules describe how the abstract syntax (the plan instance tree) is manipulated during runtime. Due to the sheer number of rules, only a small subset of rules will be shown to give the flavor of the concept. Also, we will simplify the abstract syntax to be more minimal as all that is needed by the LST Evaluator is the name, lifetime state, and the Do Expression contained within each plan instance. The ignored parameters can be assumed to be immutable. The reduced abstract syntax is as follows:
+\begin{verbatim}
+type planExp              = PlanInst of string * ltState * doExp
+                            | Op of opType * planExp * planExp 
+                            | IfThenElse of (mpflBool * planExp * planExp)
+and doExp                 = NIL | Do of planExp;;
+\end{verbatim}
+
+The following subsections describe the rules that compose the various evaluators described above.\footnote{Just as  type rules can use a \textit{type environment} (typically denoted as $\Gamma$), runtime evaluators can also utilize a \textit{runtime environment} (typically denoted as $\rho$). The purpose of the runtime environment is to lookup the values bound to variables and to substitute them into expressions as the evaluator encounters them. Just as the type environment was not necessary as types can be determined solely by abstract syntax structure, a runtime environment is not necessary as the MSL has no real concept of variables. Though the concept of \Code{Lookup*} calls is similar to a variable, it will later be shown that \Code{Lookup*} expressions are reduced via substitution in the \emph{Value} Evaluator.}
+
+\subsubsection{\Code{Value} Evaluator (Partial Set of Rules)} 
+The \Code{Value} Evaluator's purpose is to take any typed expression and reduce any primitive typed (integer, float, string, and boolean) subexpressions to their simplest form. Not all rules are shown because of the sheer quantity, but a small subset is given to give the idea.
+
+$$
+\infer[\nextruleid]{Integer(e) \ValueEval Integer(v)}{e \ValueEval v}
+\qquad
+\infer[\nextruleid]{Float(e) \ValueEval Float(v)}{e \ValueEval v}
+$$
+
+$$
+\infer[\nextruleid]{AddInt(e_1, e_2) \ValueEval v}{ e_1 \ValueEval v_1 & e_2 \ValueEval v_2 & v = v_1 + v_2}
+\qquad
+\infer[\nextruleid]{DivFloat(e_1, e_2) \ValueEval v}{ e_1 \ValueEval v_1 & e_2 \ValueEval v_2 & v = v_1 / v_2}
+$$
+
+$$
+\infer[\nextruleid]{StrEq(e_1, e_2) \ValueEval Bool(true)}{ e_1 \ValueEval v_1 & e_2 \ValueEval v_2 & v_1 == v_2}
+\qquad
+\infer[(\nextruleid]{StrEq(e_1, e_2) \ValueEval Bool(false)}{ e_1 \ValueEval v1 & e_2 \ValueEval v_2 & v_1 \neq v_2}
+$$
+
+$$
+\infer[\nextruleid]{Meters(e) \ValueEval Meters(v)}{e \ValueEval v}
+\qquad
+\infer[\nextruleid]{Feet(e) \ValueEval Feet(v)}{e \ValueEval v}
+$$
+
+$$
+\infer[\nextruleid]{Yards(e) \ValueEval Yards(v)}{e \ValueEval v}
+$$
+
+\subsubsection{\Code{ChangeOnState} Evaluator (Complete Set of Rules)}
+The \Code{ChangeOnState} Evaluator is utilized when applying the \Code{On} state to an expression. The only purpose of this evaluator is to ensure that plan instances already in the \Code{On(RUN)} state are not demoted to an \Code{On(READY)} state.
+
+$$
+OnMicroStates = \{READY, RUN, FORCE\_RUN\}
+$$
+$$
+OnMacroStates = \{On(READY), On(RUN), On(FORCE\_RUN)\}
+$$
+
+$$
+\infer[\nextruleid]{<cs, app> \ChangeOnStateEval On(v_1)}{cs \ValueEval On(v_1) & v_1 = RUN | FORCE\_RUN & app \ValueEval On(v_2) & v_2 \in \{OnMicroStates \backslash RUN\} }
+$$
+
+$$
+\infer[\nextruleid]{<cs, app> \ChangeOnStateEval On(RUN)}{cs \ValueEval On(RUN) & app \ValueEval On(s) & s \in OnMicroStates}
+$$
+
+$$
+\infer[\nextruleid]{<cs, app> \ChangeOnStateEval v}{cs \ValueEval lst & lst \in onMacroStates & app \ValueEval v & v \not \in OnMacroStates}
+$$
+
+\subsubsection{\Code{CurrentSerial} Evaluator (Complete Set of Rules)}         
+The \Code{CurrentSerial} Evaluator determines the overall lifetime state of a serial expression based on the lifetime states of each respective expression.
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentSerialEval Off(v_1)}{e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2)}
+\qquad
+\infer[\nextruleid]{<e_1, e_2> \CurrentSerialEval On(v_1)}{e_1 \ValueEval On(v_1) & e_2 \ValueEval On(v_2)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentSerialEval Off(v_2)}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2)}
+\qquad
+\infer[\nextruleid]{<e_1, e_2> \CurrentSerialEval On(v_2)}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentSerialEval End(v_2)}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2)}
+$$
+
+\subsubsection{\Code{CurrentXor} Evaluator (Complete Set of Rules)}
+The \Code{CurrentXor} Evaluator determines the overall lifetime state of an xor expression based on the lifetime states of each respective expression.
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval Off(v_1)}{e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2)}
+\qquad
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval On(v_1)}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval Off(v_2)}{e_1 \ValueEval End(v_1) & v_1 = RETRACT & e_2 \ValueEval Off(v_2)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval End(v_2)}{e_1 \ValueEval End(v_1) & v_1 \neq RETRACT & e_2 \ValueEval End(v_2)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval On(v_2)}{e_1 \ValueEval End(v_1) & v_1 = RETRACT & e_2 \ValueEval On(v_2)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval End(RETRACT)}{e_1 \ValueEval End(v_1) & v_1 = RETRACT & e_2 \ValueEval End(v_2) & v_2 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2> \CurrentXorEval End(COMPLETE)}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & v_1 \neq v_2 & v_1 = COMPLETE | v_2 = COMPLETE}
+$$
+
+\subsubsection{\Code{Current} Evaluator (Complete Set of Rules)}
+The \Code{Current} Evaluator determines the overall lifetime state of any \Type{planExp}. Note that this evaluator turns around and calls the various \Code{Current*} evaluators in its operation.
+$$
+\infer[\nextruleid]{PlanInst(n,cs,NIL) \CurrentEval cs}{}
+\qquad
+\infer[\nextruleid]{PlanInst(n,cs,Do(e)) \CurrentEval v}{e \CurrentEval v}
+$$
+
+$$
+\infer[\nextruleid]{Op(SERIAL,e_1,e_2) \CurrentEval v}{<e_1,e_2> \CurrentSerialEval v}
+\qquad
+\infer[\nextruleid]{Op(XOR,e_1,e_2) \CurrentEval v}{<e_1,e_2> \CurrentXorEval v}
+$$
+
+$$
+\infer[\nextruleid]{Op(GROUP,e_1,e_2) \CurrentEval v}{<e_1,e_2> \CurrentGroupEval v}
+\qquad
+\infer[\nextruleid]{Op(PARALLEL,e_1,e_2) \CurrentEval v}{<e_1,e_2> \CurrentParallelEval v}
+$$
+
+$$
+\infer[\nextruleid]{IfThenElse(cond,e_1,e_2) \CurrentEval v}{cond \ValueEval Bool(true)& e_1 \CurrentEval v}
+\qquad
+\infer[\nextruleid]{IfThenElse(cond,e_1,e_2) \CurrentEval v}{cond \ValueEval Bool(false) & e_2 \CurrentEval v}
+$$
+
+\subsubsection{\Code{NextSerial} Evaluator (Complete Set of Rules)}
+The \Code{NextSerial} Evaluator determines the state to apply to each operand in a serial expression during state transitioning based on the lifetime state that is to be applied to the complete expression. The return value is a pair of lifetime states where the first is to be applied to the first operand and the second to the second operand.
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <Off(v_3), Off(v_3)>} {e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <On(v_3), Off(BLOCK)>} {e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_3), End(v_3)>}{e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <v_4, Off(BLOCK)>}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3) & <On(v_1), On(v_3)> \ChangeOnStateEval v_4}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_3), End(v_3)>}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), Off(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), On(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), End(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), Off(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), v_4)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2) & app \ValueEval On(v_3) & <On(v_2), On(v_3)> \ChangeOnStateEval v_4 }
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), End(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2) & app \ValueEval End(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), End(v_2)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), End(v_2)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & app \ValueEval On(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextSerialEval <End(v_1), End(v_2)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & app \ValueEval End(v_3)}
+$$
+
+\subsubsection{\Code{NextXor} Evaluator (Complete Set of Rules)}
+The \Code{NextXor} Evaluator determines the state to apply to each operand in an xor expression during state transitioning based on the lifetime state that is to be applied to the complete expression. The return value is a pair of lifetime states where the first is to be applied to the first operand and the second to the second operand.
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <Off(v_3), Off(v_3)>}{e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <On(v_3), Off(SYS\_RETRACT)>}{e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_3), End(RETRACT)>}{e_1 \ValueEval Off(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <Off(v_3), Off(v_3)>}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <v_4, Off(SYS\_RETRACT))>}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3) & <On(v_1), On(v_3)> \ChangeOnStateEval v_4 }
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_3), On(READY)>}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3) & v_3 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_3), End(RETRACT)>}{e_1 \ValueEval On(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3) & v_3 \neq RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), Off(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval Off(v_3) & v_1 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(RETRACT)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval Off(v_3) & v_1 \neq RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), On(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3) & v_1 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), On(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval On(v_3) & v_1 \neq RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3) & v_1 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(RETRACT)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval Off(v_2) & app \ValueEval End(v_3) & v_1 \neq RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), Off(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2) & app \ValueEval Off(v_3) & v_1 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), On(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2) & app \ValueEval On(v_3) & v_1 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(v_3)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval On(v_2) & app \ValueEval End(v_3) & v_1 = RETRACT}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(v_2)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & app \ValueEval Off(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(v_2)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & app \ValueEval On(v_3)}
+$$
+
+$$
+\infer[\nextruleid]{<e_1, e_2, app> \NextXorEval <End(v_1), End(v_2)>}{e_1 \ValueEval End(v_1) & e_2 \ValueEval End(v_2) & app \ValueEval End(v_3)}
+$$
+
+\subsubsection{\Code{LST} Evaluator (Complete Set of Rules)}
+The \Code{LST} Evaluator is the master evaluator that we are trying to describe. This evaluator takes a \Type{planExp} and applies some desired \Type{ltState} value to it. The end result is copy of the passed \Type{planExp} with lifetime states of some of the plan instances potentially changed.
+$$
+\infer[\nextruleid]{<PlanInst(n,cs,NIL),app> \LSTEval PlanInst(n, ns, NIL))}{cs \ValueEval ns & ns \in OnMacroStates & <cs, app> \ChangeOnStateEval ns}
+$$
+
+$$
+\infer[\nextruleid]{<PlanInst(n,cs,NIL),app> \LSTEval PlanInst(n, app, NIL))}{cs \ValueEval ns & ns \not \in OnMacroStates}
+$$
+
+$$
+\infer[\nextruleid]{<PlanInst(n,cs,Do(e)),app> \LSTEval PlanInst(n, ns, Do(e'))}{<e,app> \LSTEval e' & e' \CurrentEval ns}
+$$
+
+$$
+\inferLineSkip=5pt
+\infer[\nextruleid]{<Serial(e_1,e_2),app> \LSTEval Serial(v_1,v_2)}{\deduce{\deduce{<e_2, ns_2> \LSTEval v_2}{<e_1,ns_1> \LSTEval v_1}}{\deduce{<cs_1, cs_2, app> \NextSerialEval <ns_1, ns_2>}{e_2 \CurrentEval cs_2 & e_1 \CurrentEval cs_1}}}
+\qquad
+\inferLineSkip=5pt
+\infer[\nextruleid]{<Group(e_1,e_2),app> \LSTEval Group(v_1,v_2)}{\deduce{\deduce{<e_2, ns_2> \LSTEval v_2}{<e_1,ns_1> \LSTEval v_1}}{\deduce{<cs_1, cs_2, app> \NextGroupEval <ns_1, ns_2>}{e_2 \CurrentEval cs_2 & e_1 \CurrentEval cs_1}}}
+$$
+
+$$
+\inferLineSkip=5pt
+\infer[\nextruleid]{<Parallel(e_1,e_2),app> \LSTEval Parallel(v_1,v_2)}{\deduce{\deduce{<e_2, ns_2> \LSTEval v_2}{<e_1,ns_1> \LSTEval v_1}}{\deduce{<cs_1, cs_2, app> \NextParallelEval <ns_1, ns_2>}{e_2 \CurrentEval cs_2 & e_1 \CurrentEval cs_1}}}
+\qquad
+\inferLineSkip=5pt
+\infer[\nextruleid]{<Xor(e_1,e_2),app> \LSTEval Xor(v_1,v_2)}{\deduce{\deduce{<e_2, ns_2> \LSTEval v_2}{<e_1,ns_1> \LSTEval v_1}}{\deduce{<cs_1, cs_2, app> \NextXorEval <ns_1, ns_2>}{e_2 \CurrentEval cs_2 & e_1 \CurrentEval cs_1}}}
+$$
+
+$$
+\infer[\nextruleid]{<IfThenElse(cond, e1, e2), app> \LSTEval IfThenElse(cond, v_1, v_2)}{cond \ValueEval Bool(true) & <e_1,app> \LSTEval v_1 & <e_2, Off(SYS\_RETRACT)> \LSTEval v_2}
+$$
+
+$$
+\infer[\nextruleid]{<IfThenElse(cond, e1, e2), app> \LSTEval IfThenElse(cond, v_1, v_2)}{cond \ValueEval Bool(false) & <e_1,Off(SYS\_RETRACT)> \LSTEval v_1 & <e_2, app> \LSTEval v_2}
+$$
+
+\subsection{Purpose of Formal Specification}
+In programming language theory, the purpose of defining a language formally serves two purposes. The first is to describe precisely what a program in the language means so that somebody creating a compiler or interpreter for the language can implement it. The second is to be able to prove properties about the language, mainly those that show its \emph{correctness}. What defines correctness depends on the language, but one of the typical properties language designers want to prove is if their language is \Definition{well-typed}. To show that a language is well-typed, we must prove that the evaluation semantics (the operational semantics in this case) exhibit two properties: \Definition{type preservation} and \Definition{evaluation progress} \citep{pierce:types}. Type preservation means that if we take any typed expression in the language and evaluate it, each new expression that is created during the evaluation leading up to the final reduced expression has the same type. Evaluation progress means that for every valid expression in the language, the evaluator will be able to process it and produce another valid expression in the language (which in turn exhibits the progress property and so on). Proving these properties typically requires looking at every possible expression in the language via a proof by structural induction. If a language is shown to be well-typed, it is an extremely powerful statement about the language as it guarantees that a valid program will never end up in an invalid state. Unsafe languages such as C and C++ are not well-typed because they allow users to circumvent the type system by being able to cast any value in the language to any type, even if it is not valid. This is also why use of such languages result in programs that have a much higher tendency for bugs, memory leaks, and security vulnerabilities.
+
+In this thesis, no proof is given to show the correctness of the language as it is beyond the scope of the thesis. It would be wise in the future to create such a proof. For example, if one looks at the rules for one of the evaluators specified above, they may notice that even for evaluators where all rules are given, rules are not specified for all possible expressions. This is because not all expressions are valid in the language, even if they can be expressed by the abstract syntax (just as with the static semantics). By showing a proof of the language being well-typed, there is a guarantee that none of those invalid expressions can ever be reached. It is also interesting to note that because the MSL is not as powerful as a general-purpose language, one maybe able to prove more interesting properties than just being well-typed, such as \textit{``every MSL program is decidable."}
+
+Setting up such a proof requires a complete set of type and runtime rules that describes the entire compiler as a single evaluator function. For each possible expression in the language, one has to show inductively that both types are preserved during evaluation (\textit{preservation}) and that indeed the evaluation can proceed by a single step to another valid expression (\textit{progress}). Practically this is difficult because not only is the number of rules large, but only a subset of the semantics have been formalized. 
+
+The subsequent section discusses the MPFL runtime stage that follows the LST Evaluator. Unlike the LST Evaluator, the runtime semantics will be described informally.
+
+\section{Planner Invocation (PI) Evaluator}\LabelSection{pievaluator}
+After the LST Evaluator completes its execution, the plan instance tree has been updated with new lifetime states for each plan instance. Up to this point, it is understood that the lifetime state is important in MPFL to enforce the semantics of the language. but how it uses that state has yet to be explained. The lifetime state is used extensively in the next component of the MPFL engine, the \Definition{Planner Invocation (PI) Evaluator}, where the bulk of system computation occurs. The PI Evaluator is the final stage in the MPFL engine and the point where schedules are generated for the robot's actuators and subsystems. 
+
+\subsection{Plugins and Initialization}
+When a user initializes the MPFL runtime/compiler in their client application, in addition to passing in a mission specification file written in the MSL, the user also must pass in a set of plugins. These plugins are used almost exclusively by the PI Evaluator. One of the plugins is called the \Definition{Knowledge Base} and the remainder are called \Definition{Planners}. These plugins are implemented through an object-oriented API by subclassing from a set of provided base classes and then passing in instances of those classes (i.e. objects) into the MPFL initialization function. We can now define the type signature of the initialization function, \Code{initialize\_mpfl}:
+
+\begin{center}
+\Code{initialize\_mpfl: string -> knowledgeBase -> planner list -> unit}\\
+\end{center}
+
+The function \Code{initialize\_mpfl} takes a string representing the path and name of the MSL mission specification file, an object of the class \Type{knowledgeBase} and a list of objects of the class \Type{planner}. The base classes that MPFL provides define an abstract interface that forces implementors of the plugins to implement a set of callback methods needed by the runtime. During initialization, the specification is verified within the Parser and PIT Builder stages. If there are any problems, an exception is raised indicating the system could not be bootstrapped.
+
+\subsection{Knowledge Base}
+The purpose of the knowledge base is to provide perception information to MPFL and the various planners that are passed into the system. The knowledge base is what drives the \Code{Lookup*} calls that users can utilize in the MSL. Users define a knowledge base by subclassing from the MPFL-provided base class \Type{knowledgeBase} which requires overriding four abstract methods with the following type signatures:
+
+\begin{itemize}
+\item \Code{lookup\_string : string -> string}
+\item \Code{lookup\_float : string -> float}
+\item \Code{lookup\_integer: string -> int}
+\item \Code{lookup\_bool: string -> bool}
+\end{itemize}
+
+The first argument to each function corresponds to the set of valid keys that one can utilize with the various lookup calls. The implementor of the knowledge base must return a value based on the key passed to the method. If not found, they should call the base class version of the method which will raise an exception likely terminating the MPFL runtime. Users can also add additional methods to the knowledge base which can then be accessed by the various planners in the system. 
+
+\subsubsection{Formal Semantics of Lookup Calls}
+The operational semantics of the Value Evaluator when dealing with \Code{Lookup*} calls can now be specified formally. Note that the `\#' notation below indicates invocation of a method on on object (i.e. \Code{\textit{object\#method}}) in OCaml.
+
+$$
+\infer[\nextruleid]{LookupString(key) \ValueEval v}{key \ValueEval keyVal & \Code{KnowledgeBase\#lookup\_string keyVal} \OCamlEval v}
+$$
+
+$$
+\infer[\nextruleid]{LookupFloat(key) \ValueEval v}{key \ValueEval keyVal & \Code{KnowledgeBase\#lookup\_float keyVal} \OCamlEval v}
+$$
+
+$$
+\infer[\nextruleid]{LookupBool(key) \ValueEval v}{key \ValueEval keyVal & \Code{KnowledgeBase\#lookup\_bool keyVal} \OCamlEval v}
+$$
+
+$$
+\infer[\nextruleid]{LookupInteger(key) \ValueEval v}{key \ValueEval keyVal & \Code{KnowledgeBase\#lookup\_int keyVal} \OCamlEval v}
+$$
+
+\subsection{Planners}
+Planners are the modules that actually perform scheduling in the system. Each primitive plan in the MSL has a corresponding planner associated with it. For example, there is a \Code{Search} Planner for the \Code{Search} type, a \Code{UseAutopilot} Planner for the \Code{UseAutopilot} type, and so on. Planners are implemented by subclassing from a set of MPFL-provided base classes, one for each primitive plan type. Each planner is simply a scheduler for the tasks represented by plan instances of a certain primitive plan type. Recall that each plan instance is a representation of a living instance of a plan (i.e. task). The PI Evaluator extracts from the plan instance tree each set of primitive plan instances of a certain primitive plan type and then feeds them to the corresponding planner of the same plan type and requests the planner to schedule the tasks. For example, all the \Code{Loiter} plan instances in the tree, regardless of where they are in the tree, are fed to the Loiter planner. The \Code{Loiter} planner can then build a schedule for all \Code{Loiter} plan instances via a callback method implemented by the designer of that particular \Code{Loiter} planner. The planner can utilize the metadata contained within the plan instance (name, constraints, lifetime state, task parameters, etc) then to build a valid schedule for each one.
+
+\subsection{Planners and the MSL}
+One of the interesting things about MPFL's Planner API is that planners have the features of the MSL integrated into the API.  Planners have the ability to create additional primitive plan instances that can be attached as children to the plan instances it is scheduling, just as one can in the MSL by creating plan instances of a user-defined plan. For example, performing a search operation requires use of both the vehicle's navigation system as well as its sensors. In this case, an implementation of a \Code{Search} planner could create a \Code{Transit} plan instance for performing the search movement and a \Code{UseSonar} plan instance for utilizing the sensor for each of its \Code{Search} plan instances. These children plan instances can be attached to each Search plan instance and end up extending the plan instance tree. Additionally, the Planner API allows users to describe temporal relations between these new plan instances just as in the MSL using a Do Expression with all available planning operators. In the example of the \Code{Search} planner, the planner implementation not only wants to create a \Code{Transit} and \Code{UseSonar} plan instance for each \Code{Search} plan instance, but also to describe the relationship through a parallel (\Code{||}) operator. The API also allows the user to create additional constraints (i.e. time, power) as in the MSL and bind them to the newly created children. 
+
+\subsection{Planner Graph}
+The ability for planners to create new problems (i.e. plan instances) is implemented by arranging planners in a hierarchy, specifically a directed acyclic graph called the \Definition{planner graph}. In the example with the \Code{Search} planner, the \Code{Transit} and \Code{UseSonar} planners would be children of the \Code{Search} planner as the \Code{Search} planner can create subproblems for the \Code{Transit} and \Code{UseSonar} problems. When a planner designer creates a planner, they must pass which types of children plan instances they intend to create in the constructor specifying the \Definition{planner dependencies}. Dependencies of planners cannot be circular, hence why the planner graph is a directed acyclic graph. Having circular dependencies would make the PI Evaluator algorithm undecidable, hence the restriction. When \Code{initialize\_mpfl} is called to bootstrap the system, MPFL creates a topographical sorting of the planners to guarantee this property. If a topographical sorting does not exist, \Code{initialize\_mpfl} will raise an exception.
+
+\subsection{Planner Isolation and Component Reusability}
+MPFL was designed to make it easy to reuse components. Those components refer primarily to planners where most of the application-specific code sits. MPFL is able to achieve this by making planners independent entities which can be built without having any understanding of implementation details of any other planners or the MPFL compiler/runtime itself. Though planners can create additional plan instances for their children planners, they do not have nor should have an understanding of how those children planners operate. This makes it easy to swap out one planner with another of the same type transparently and potentially even allowing for hot swapping. The caveat is that 1) the swapped-in planner's dependencies do not create cycles in the planner graph and 2) the swapped-in planner has all the information it needs within the existing knowledge base. When a person implements a specific planner, they focus exclusively on that problem and do not worry about any of the other planners in the system. This makes it easier for autonomy developers as they can focus completely on building schedulers for a particular type of task without worrying about how other planners are implemented. This also makes designing the system easier as it breaks the entire planning autonomy system into piecemeal chunks which can be reasoned about individually. It is also not necessary for users to provide a planner for each type of primitive plan in the language but rather only the subset that the user uses in their mission specification. For example, if one does not create \Code{Loiter} plan instances in their mission specification, it is not necessary to create a \Code{Loiter} planner. However if one were to declare \Code{Loiter} plan instances and no \Code{Loiter} planner was provided, it would result in an exception during initialization.
+
+\subsection{The Planner API}
+Each kind of primitive plan in the language has a corresponding base class that users must subclass in order to implement that planner.  Each of the bases class has a common base class of type \Type{planner}. Each class defines five methods that the user must override in the same manner as they would with the \Type{knowledgeBase}. The methods require an additional set of OCaml types not defined in the abstract syntax that are exclusively part of the MPFL API.
+
+\begin{verbatim}
+type userPlanExp   =  PlanInst of (string * problem) 
+                      | Op of opType * userPlanExp * userPlanExp 
+                      | IfThenElse of (mpflBool * userPlanExp * userPlanExp)
+                      | With of (constraintImp);;
+type errorReason    = string;;
+type planInstName   = string;;
+type planInstChain  = string;;
+type scheduleRecord = ScheduleRecord of (time * time * planInstChain * string);;
+type schedule       = Schedule of scheduleRecord list 
+                      | ScheduleInfeasible of (errorReason * planInstChain) list 
+                      | ScheduleConflict of (errorReason * (planInstChain list)) list 
+                      | ScheduleNoUpdate
+                      | ScheduleAutobuild of string;; 
+\end{verbatim}
+
+The type \Type{userPlanExp} is a simplified version of the type \Type{planExp} which is utilized by planners to build children plan instances. The type \Type{scheduleRecord} encodes a single row of a schedule where the first parameter refers to the time at which the command encoded within the row should be issued, the second indicates the time when the task associated with the command is expected to complete, the third parameter indicates the plan instance the row is associated with as a string in chain notation (e.g. a $\rightarrow$ b $\rightarrow$ c), and the last in a string encoding the actual command that should be issued. The schedule itself is encoded with type \Type{schedule} using the constructor \Code{Schedule} which takes a list of \Type{scheduleRecords} as a parameter. The \Type{schedule} type is a variant type, in the event a schedule cannot be formed it also can take the value of an infeasibility error or conflict error utilizing the \Code{ScheduleInfeasible} and \Code{ScheduleConflict} constructors respectively. For infeasibilities, the constructor takes a list of pairs, each one containing a reason for the infeasibility and the name of the plan instance (again in chain notation) that is infeasible. For conflicts, the constructor is similar, but takes a list of plan instance names as the second argument in the constructor indicating conflicting instances. The constructor \Code{ScheduleNoUpdate} is utilized when no updates are made to last schedule created. Finally, the \Code{ScheduleAutobuild} constructor is a convenient way for planners to automatically build their schedule based on the way their children plan instances are scheduled in child planners. For each plan instance the planner is scheduling for, MPFL will determine the earliest start time and latest end time amongst all its children instances according to their corresponding schedules. A row is automatically built in the schedule with the corresponding minimum start time and maximum end times for each plan instance in the automatically built schedule. The string constructor argument is used to populate the command field for each row.
+
+\subsubsection{The Class \Code{planInstance}}
+In addition to the new abstract types, we must also define class \Type{planInstance} before defining the class \Type{planner}. Plan instances are fed to each planner in the form of objects of this class. Each type of primitive plan in addition to having its own \Type{planner} base class has a representative subclass of \Type{planInstance} (e.g. \Type{loiterPlanInstance} is a subclass of \Type{planInstance} and represents a \Code{Loiter} plan instance). The use of objects instead of simple variant type values is useful for plan instances because it provides a means of extracting information about the plan instance via methods. Though the same could be achieved with functions and closures, methods take functions further as they are a means of \emph{encapsulating} those functions within the realm of the object and its internal state. For example, it is typical in modern software engineering to utilize an \Definition{interactive developer environment (IDE)} to help manage and ease development (e.g. \textit{Eclipse}, \textit{Microsoft Visual Studio}, \textit{NetBeans}). IDEs for object-oriented languages like OCaml pop up a list of methods applicable to an object based on its class type when one tries to invoke a method on that object. Internally MPFL uses a functional style, but externally it utilizes an object-oriented approach to make it easier for developers to reason about and discover the API. The base class \Type{planInstance} has the following methods:
+
+\begin{itemize}
+\item \Code{get\_lifetime\_state : unit -> ltState} - Gets the current lifetime state of the plan instance
+\item \Code{get\_constraints : unit -> constraintImp list} - Gets all the constraints bound to the plan instance
+\item \Code{get\_all\_time\_constraints : unit -> timeConstraint list} - Gets all time constraints bound to the plan instance
+\item \Code{get\_all\_power\_constraints : unit -> powerConstraint list} - Gets all power constraints bound to the plan instance
+\item \Code{get\_overall\_time\_constraint : unit -> timeConstraint} - Gets the set intersection of all time constraints as a single time constraint
+\item \Code{get\_overall\_power\_constraint : unit -> powerConstraint} - Gets the set interesection of power constraints as a single power constraint
+\item \Code{get\_problem : unit -> problem} - Gets the underlying problem based on the specific primitive plan type the plan instance represents (e.g. \Code{Loiter, Search, UseModem, etc})
+\end{itemize}
+
+There is a subclass of \Type{planInstance} for each specific primitive plan. These subclasses provide additional methods that allow API users to access information about the specific problem the plan instance represents. For example, the class \Type{searchPlanInstance} provides a set of methods to access information about the search area, lane width, sensor to use, etc. Each subclass provides methods to access information contained within the plan instance constructor for the respective type of primitive plan it represents. The MPFL API also provides an additional module which allows users to easily convert values returned by these methods into different units and representations. For example, when one gets the lane width for the search problem, they can get it back in any unit of length they want; it does not matter how it was specified. Additionally, useful calculations applicable to specific types are encoded as functions in this module. For example, if one has two values of type \Type{position}, the API provides a method to get the distance between the two even though the underlying representation of one position maybe as a geographical (i.e. lat/lon) position and the other a Cartesian position relative to some fixed geographical point. API users do not worry about how the user specified the units in the MSL --- in fact they have no idea. All they can do is ask for the value in the units that are most convenient to them.
+
+\subsubsection{The Class \Code{planner}}
+Using these types, we can now define the class \Type{planner}. The class \Type{planner} is a type polymorphic class, meaning that it requires a type parameter $\alpha$. $\alpha$ is constrained to be a subclass of another class \Type{planInstance} (i.e. $\alpha <:$ \Type{planInstance}). The class methods are defined as follows:
+
+\begin{itemize}
+\item \Code{on\_ready\_to\_running: $\alpha$ list -> (planInstChain * bool) list} - Callback method that is invoked when asking the planner to specify which plan instances to switch from a \Code{On(READY)} state to an \Code{On(RUN)} state.
+\item \Code{on\_forcerun\_to\_running: $\alpha$ list -> (planInstChain * bool) list} - Callback method that is invoked when asking the planner to specify which plan instances to switch from a \Code{On(FORCE\_RUN)} state to an \Code{On(RUN)} state.
+\item \Code{on\_running\_to\_complete: $\alpha$ list -> (planInstChain * bool) list} - Callback method that is invoked when asking the planner to specify which plan instances to switch from a \Code{On(RUN)} state to an \Code{End(COMPLETE)} state.
+\item \Code{on\_ask\_for\_subproblems: $\alpha$ list -> (planInstChain * userPlanExp) list} - Callback method that is invoked when asking the planner to create subproblems (i.e. child plan instances) in the form of \Type{userPlanExp}.
+\item \Code{build\_schedule:           $\alpha$ list -> schedule} - Callback method that is invoked when asking the planner to build its final schedule .
+\end{itemize}
+
+The MPFL API provides a subclass of \Type{planner} for each primitive plan type. These subclasses are all virtually identical. The only thing that differentiates them is the value of $\alpha$ which is the corresponding \Type{planInstance} subclass. For example, the class \Type{useModemPlanner} is simply an alias for a \Type{useModemPlanInstance planner}, meaning the type variable $\alpha$ has been instantiated with type \Type{useModemPlanInstance}.
+
+\subsection{The PI Evaluator Algorithm}
+Now that the class \Type{planner} has been defined, the PI Evaluator's interaction with planners can be examined. The methods defined in \Type{planner} are callback methods that are fired by the PI Evaluator at different stages throughout its execution. The PI Evaluator performs two traversals of the planner graph in order to do this: the first being a top-down, breadth-first traversal and the second being a bottom-up traversal in the reverse order of the first traversal as depicted in \RefPicture{top_down_and_bottom_up_traversal.png}.
+
+\InsertPicture{top_down_and_bottom_up_traversal.png}{0.25}{The two traversals performed by PI Evaluator on the planning graph}
+
+\subsubsection{Top-Down Traversal}
+In the top-down traversal, the callback methods \Code{on\_ready\_to\_running},\\ \Code{on\_forcerun\_to\_running}, \Code{on\_running\_to\_complete}, and \Code{on\_ask\_for\_subproblems} are fired for each planner in the order listed. For the first three in the list, the PI Evaluator is asking each planner to make a decision about transitioning a set of plan instances that are in some state into another state. In the previous MPFL stage, the LST Evaluator attempted to transition as many plan instances as it could into the \Code{On(READY)} state. Planners now must decide if they want to move those instances into a running (\Code{On(RUN)}) state so that they can plan for them via the \Code{on\_ready\_to\_running} callback. The method is passed a list of \Type{planInstance} objects as a callback parameter which are plan instances for that specific planner in the \Code{On(READY)} state. To indicate to the runtime that they want to switch the state, the planner returns a list of \Code{(planInstChain * bool)} pairs. The first entry in the pair refers to the plan instance (as a string in plan instance chain notation) to potentially be switched and the second a boolean set to true if the planner implementor wants to switch states. If not, the parameter is set to false and the plan instance remains in an \Code{On(READY)} state. The same applies to \Code{on\_forcerun\_to\_running} and \Code{on\_running\_to\_complete} but from \Code{On(FORCE\_RUN)} to \Code{On(RUN)} and \Code{On(RUN)} to \Code{End(COMPLETE)} respectively. For the forced-running to running callback, if the user indicates that the plan instance cannot go into a running state, the plan instance will be disabled as will any plan instances which caused the plan instance to go into the forced-to-run state. The running to complete callback is used to indicate to the MPFL runtime that a plan instance is complete means that the goal represented by the plan instance has been achieved. The final callback method \Code{on\_ask\_for\_subproblems} is invoked to give the planner an opportunity to create subproblems for its plan instances by forming an expression similar to the Do Expression in the MSL for each plan instance. The callback is passed all plan instances for the planner and must return a list of \Code{(planInstChain * userPlanExp)} pairs. Each pair indicates the plan instance (in chain notation) to which to attach children and the second represents the children plan instances along with any planning operators, constraints, and conditional expressions encoded within a \Type{userPlanExp}. If the planner returns an empty list, it indicates that the user either has no children plan instances or does not want to make a change to children attached in a previous compiler cycle. If previous children exist and the user creates new children, the old ones are detached from the plan instance tree, destroyed, and replaced by the new children. All return values of the callback methods are verified using the following rules:
+\begin{itemize}
+\item All plan instances referenced in the return values of each method are verified immediately and will raise an exception if not valid.
+\item The callback method can only refer to plan instances passed to it during invocation.
+\item For the first three callbacks that perform lifetime state changes, the planner must make a decision for each passed plan instance otherwise it will result in an exception being raised.
+\end{itemize}
+
+\subsubsection{Bottom-Up Traversal}
+After the top-down traversal, the PI Evaluator invokes the final callback method for each planner in the exact reverse order of the top-down traversal (i.e. bottom-up). The method \Code{build\_schedule} asks the planner to build a schedule for all the plan instances it has in a running state. The planning algorithm is decided by the implementor of the planner and is the most difficult aspect of building a planner. There is no restriction to the algorithm, however it must have the following properties:
+\begin{itemize}
+\item It must be able to schedule tasks accounting for start time and end time.
+\item The start time and end time are described as a window of time rather than an exact time. The algorithm must make sure to obey these rules.
+\item The algorithm must be able to provide feedback when it fails giving indication of why something is not possible in terms of infeasibilities and/or conflicts.
+\item The algorithm must be decidable and take a limited amount of time, otherwise it will cause the MPFL engine to stall. Currently the compiler is implemented in a single thread of execution so a planner could potentially jam the system if any of its callbacks block.
+\item The algorithm only needs to return feasible schedules, but it is useful if the algorithm gives back optimal or suboptimal solutions that minimize resource usage. Algorithms that are designed to improve robot performance with each \Code{build\_schedule} invocation are ideal.
+\end{itemize}
+
+The planners are meant to build a schedule for the tasks in an running (i.e. \Code{On(RUN)}) state. The planner can and should account for other plan instances, such as those in blocked (\Code{Off(BLOCK)}) state, but does not necessarily have to as the bare minimum requirement is just to look at those in \Code{On(RUN)}. Planners which are more \emph{deliberative} versus \emph{reactive} will take into account plan instances that will eventually be unblocked in the future or may be reactivated such as those in an \Code{Off(DISABLE)} or \Code{Off(SYS\_RETRACT)} state. Planners have the ability to look at schedules for child planners in order to build their own schedules to take into account how children plan instances have been scheduled. Planners form their schedules by creating a list of \Type{scheduleRow} values and enclosing them within a \Code{Schedule} constructor. In the event there is an infeasibility or conflict, the constructors \Code{ScheduleInfeasible} and \Code{ScheduleConflict} can be used respectively passing error information in the constructor as mentioned earlier. If the user does not want to update the schedule in the case when nothing has changed, they can use the special \Code{ScheduleNoUpdate} constructor which takes no parameters. 
+
+\subsection{Schedules and Verification}
+The schedule generated by each planner consists of four entries: a time to issue the command, a time the command is expected to finish, the name of the plan instance associated with the command, and the actual command itself. The PI Evaluator verifies that each row in the schedule has the following properties:
+\begin{itemize}
+\item Each plan instance in each schedule row actually exists and is of the same primitive plan type as the planner.
+\item Each row has a start and end time that is within the overall time constraint of the plan instance.
+\item Each row refers to a plan instance that is in an \Code{On(RUN)} state.
+\end{itemize}
+
+Failure to not meet these criteria results in raising an exception that will terminate MPFL. The last entry in each row represents a command which is simply a character string. MPFL does not dictate nor enforce any particular encoding of the command; the only requirement is that it is a string of characters. The client application must have an understanding of how the command is encoded and how it should be parsed. This was done to give planner implementors flexibility in their overall autonomy solution at the cost of not having any verification from the MPFL runtime.
+
+\section{Putting it All Together - The Basic MPFL Compiler engine}
+After the schedules are verified, they are passed back to the client application where the user can process them in order to issue commands to subsystems at the appropriate times. At this point, a single compilation cycle of the basic MPFL engine has completed. Now that the basic pieces of the MPFL compiler engine have been described, it can be summarized by the following algorithm.
+
+\begin{enumerate}
+\item Write a mission specification in the MSL as a text file.
+\item Initialize the MPFL framework with a set of planners and the name of the text file.
+\item The framework feeds the mission specification to the parser.
+\item The Parser builds an abstract representation of the mission specification and hands it to the PIT Builder.
+\item The PIT Builder validates the specification and generates the initial plan instance tree. The plan instance tree is then handed off to the LST Evaluator.
+\item The LST Evaluator transitions the lifetime state of all the plan instances in the tree based on MPFL's internal transitioning rules. The plan instance tree is then passed off to the PI Evaluator.
+\item\begin{enumerate}
+	\item The PI Evaluator does a breadth-first, top-down traversal of the planners. For each planner:\begin{enumerate}
+		\item The planner is asked to transition \Code{On(READY)} instances to \Code{On(RUN)}, \Code{On(FORCE\_RUN)} instances to \Code{On(RUN)}, and \Code{On(RUN)} instances to \Code{On(COMPLETE)}
+		\item The planner is asked for subproblems for its children. The subproblems must be of the same primitive plan type as the planner's dependency planners.
+		\end{enumerate}
+	\item The PI Evaluator traverses all the planners in the reverse order and asks them to build a schedule and verifies the correctness of the schedules.
+	\end{enumerate}
+\item The schedules are passed back to the client application where they can be used to control the robot.
+\item Goto 6.
+\end{enumerate}
+
+\section{The Complete MPFL Compiler/Runtime Engine}
+The previous section described the core stages of the MPFL compiler. However the issue of exception handling was not discussed which adds slightly more complexity. \RefPicture{mpfl_engine_full.png} depicts the complete engine and an additional evaluator module called the \textit{Exception Handler (EH) Evaluator}.
+
+\InsertPicture{mpfl_engine_full.png}{0.25}{Complete MPFL Engine}
+
+\subsection{Planners Raise Exceptions}
+Recall in the MSL there are exception handlers for infeasibilities (\Code{OnInfeasible}) and conflicts (\Code{OnConflict}). How these handlers are invoked by the MPFL compiler has not yet been discussed. The presentation begins with the \Type{schedule} OCaml variant type:
+
+\begin{verbatim}
+type schedule = Schedule of scheduleRecord list 
+              | ScheduleInfeasible of (errorReason * planInstChain) list 
+              | ScheduleConflict of (errorReason * (planInstChain list)) list 
+              | ScheduleNoUpdate
+              | ScheduleAutobuild;;
+\end{verbatim}
+
+Infeasibilites and conflicts are determined by individual planners. If planners are given a set of plan instances to schedule for, and the planner cannot create a schedule, it can inform the MPFL compiler via the return value of the \Code{build\_schedule} callback method. If the problem is caused by a task(s) being infeasible (i.e. the task(s) are impossible to perform) then the planner informs the MPFL compiler of which plan instances are causing infeasibility. Sometimes the problem is not an infeasibility, but rather a scheduling conflict. For example, if a UseSonar planner has two plan instances that want to use the sonar at the same time and the two requests cannot be interlaced or separated, then the UseSonar planner can inform the compiler of the conflict via an API call. The planner is not limited to just two plan instances conflicting, if many instances are conflicting, the planner can inform the compiler of all of them. For the callback method \Code{build\_schedule}, the planner can indicate an infeasibility or conflict by using the \Code{ScheduleInfeasible} and \Code{ScheduleConflict} constructors respectively.
+
+When building infeasibility or conflict errors with these constructors, planners have the ability to provide \Definition{trace information} by indicating not only the plan instances that caused the problem, but also why the error occurred in a natural language such as English. This enables one to have a high-level explanation of why problems occured when reviewing the robot's mission logs to see why it was not able to accomplish certain tasks. For example, a \Code{UseAutopilot} planner may deem a particular \Code{UseAutopilot} plan instance infeasible because it cannot make it to the destination within its time constraints. The planner implementor, when informing the compiler of the infeasibility, can also pass a string that says something along the lines of \emph{``Infeasible because planner cannot make it to destination within specified time constraint"}. This is extremely useful in debugging and also gives insight into how the robot \textit{thinks}.
+
+\subsection{Handling Errors via the Exception Handler (EH) Evaluator}
+When the \Code{build\_schedule} function returns a value of \Code{ScheduleInfeasible} or \Code{ScheduleConflict}, the PI evaluator is aborted and a special evaluator, the \Definition{Exception Handler (EH) Evaluator} is invoked with the error as a parameter. The handler does the following:
+\begin{itemize}
+\item The plan instances returned in the error must refer to valid plan instances and are validated by the EH Handler.
+\item  The EH Handler checks for the nearest handler within scope. The handlers are encoded within each \Code{ExecutePlan} plan instance. Each handler's case signature is matched against the plan instance name based on the rules from Chapter 4 traversing from the erroneous plan instance up to the root sortie plan instance. If a match occurs, the handler code is extracted. With conflict handlers, handlers are searched for each conflicting plan instance. The handlers are searched in breadth-first fashion with the first matching handler returned.
+\item The EH Handler evaluates the handler code, which is encoded as a \Type{handlerExp} mentioned earlier in the chapter. The result of the evaluation is the application of a lifetime state of \Code{Off(DISABLE)} or \Code{Off(RETRACT)} to a subtree within the plan instance tree via an invocation of the LST Evaluator. The subtree root is the plan instance containing the matched handler.
+\Code Control is then returned to the PI Evaluator which reattempts the bottom-up traversal starting at the lowest planner in the planner graph which has had a change in one of its plan instances. It may take several invocations of the EH Handler to create a schedule, but eventually the PI Evaluator will finish. In the worst case, all plan instances may end up being either disabled or retracted (i.e. nothing can be scheduled) before the PI Evaluator can finish.
+\end{itemize}
+
+\section{Replanning As Recompilation}
+The MPFL engine is intended to be constantly reinvoked via the \Code{build\_schedule} call which results in a new set of schedules. The lifetime state is all the dynamic information the runtime requires to manage plan instances. This simple state allows the compiler to mark tasks throughout their lifetimes and allows planners to have metainformation about the tasks for its scheduling algorithms. One analogy is to think of airline departure and arrival schedules at an airport. Periodically the schedules refresh with updated information. Planes that were once in an \textit{On Time} state can quickly switch to a \textit{Delayed} status and then back again. 
+
+\section{Segue: Building an Autonomous Robot with MPFL}
+This chapter described the inner-workings of the MPFL compiler/runtime while simultaneously showing how the API is utilized. One can now see that the core MPFL compiler/runtime really does not perform the actual planning, but rather provides guide rails for implementing a distributed hierarchical scheduling system with lots of verification, a powerful language to express problems, and metainformation to help schedule. Though the internals of MPFL may be a bit confusing, the ease of use of MPFL is made much clearer with an example. The next chapter details an example system that implements both a knowledge base and a set of planners in order to provide a complete example of an autonomous system robot MPFL.
+
+

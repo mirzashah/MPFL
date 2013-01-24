@@ -1,0 +1,62 @@
+
+
+\chapter{Formal Specification of the UA2 Framework}
+This chapter gives a formal description of the syntax and semantics of the UA2 language. The syntax is described as a context-free grammar in Backus-Naur Form. The semantics of the language are described using big-step operational semantics as a collection of inference rules.
+
+\section{Language Grammar}
+
+\section{Static Verifier Evaluator}
+\subsection{Abstract Syntax}
+UA2ProgDecl     := UA2Prog of (Device list * UserPlanDecl list)
+UserPlanDecl    := UserPlan of (UserPlanName:string * PlanInstDecl list * ConstraintDecl list * DoExpDecl)
+ConstraintDecl  := Constraint of (ConstraintName:string * ConstraintDef)
+ConstraintDef   := TimeConstraint of (...) | PowerConstraint of (...)
+PlanInstDecl    := PlanInst of (PlanInstName:string * PlanInstDef)
+PlanInstDef     := PrimPlanInst of (PrimPlanInstDecl) | UserPlanInst of (UserPlanName:string)
+PrimPlanInstDef := Search of (...) | Transit of (...) | UseModem of (...) | UseSonar of (...)
+DoExpDecl       := DoExp of (PlanExp)
+PlanExp         := 
+
+
+
+\section{Bootstrap Evaluator}
+
+\section{Lifetime Transition Evaluator}
+
+\subsection{Abstract Syntax}
+
+$$LTState := INIT | READY | RUNNING | DISABLE | RETRACT | SYSRETRACT | COMPLETE$$
+$$OpType := Serial | Parallel | Xor | Group$$
+$$PlanExp := PlanInst of (Name:string * LTState) | Op of (OpType * PlanExp * PlanExp)$$
+
+\subsection{Type Rules}
+
+$$
+\infer{\Gamma\vdash Current(e):LTState}{\Gamma\vdash e:PlanExp}
+$$
+
+$$
+\infer{\Gamma\vdash Next(e, ns):LTState}{\Gamma\vdash e:PlanExp & ns:LTState}
+$$
+
+\subsection{Evaluation Rules}
+$$
+\infer{Current(e) \hookrightarrow cs}{e \hookrightarrow PlanInst(id,cs)}
+$$
+
+%%I have to create a context to annotate with PlanInst(id,ns)
+$$
+\infer{Next(e,ns) \hookrightarrow ns}{e \hookrightarrow PlanInst(id,cs)}
+$$
+
+\section{Planner Invocation Evaluator}
+
+\section{Putting it All Together: Unified UA2 Evaluator}
+
+\section{Conclusion}
+
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "mythesis"
+%%% End: 

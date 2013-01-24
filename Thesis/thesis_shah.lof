@@ -1,0 +1,42 @@
+\addvspace {10pt}
+\contentsline {figure}{\numberline {1.1}{\ignorespaces iRobot's \textit {Roomba} autonomous robot for vacuum cleaning. In addition to vacuuming, the Roomba is a popular platform for robot hobbyists and researchers due to its low price and hacker-friendly interface \citep {tribelhorn:evaluateroomba}. \textit {(Courtesy of iRobot Corporation)}}}{2}
+\contentsline {figure}{\numberline {1.2}{\ignorespaces Friendly Robotics' \textit {RoboMow} autonomous lawn mowing robot. \textit {(Courtesy of Friendly Robotics)}}}{2}
+\contentsline {figure}{\numberline {1.3}{\ignorespaces The Sony \textit {AIBO} is a robotic pet designed to mimic a dog. \textit {(Courtesy of Sony Corporation)}}}{3}
+\contentsline {figure}{\numberline {1.4}{\ignorespaces Adept MobileRobots' \textit {PatrolBot} is an autonomous robot for surveillance and security. Note the ultrasonic sensors (the copper mesh patches) circling the chassis and camera on top. \textit {(Courtesy of Adept MobileRobots)}}}{3}
+\contentsline {figure}{\numberline {1.5}{\ignorespaces Honda's \textit {ASIMO} \citep {sakagami:asimo} is a humanoid robot; a robot meant to mimic the anatomy of a human. \textit {(Courtesy of Honda)}}}{4}
+\contentsline {figure}{\numberline {1.6}{\ignorespaces A depiction of one of the twin Mars rovers \textit {Spirit} and \textit {Opportunity} used in NASA's \textit {Mars Exploration Rover Mission}. \textit {Courtesy of NASA}}}{4}
+\contentsline {figure}{\numberline {1.7}{\ignorespaces General Atomics' \textit {Predator} aerial unmanned vehicle drone \textit {(Courtesy of General Atomics)}}}{5}
+\contentsline {figure}{\numberline {1.8}{\ignorespaces iRobot's \textit {Seaglider} autonomous underwater vehicle \citep {eriksen:seaglider} utilizes buoyancy changes to \textit {fly} through the water in contrast to traditional propeller-based thrust \textit {(Courtesy of iRobot Corporation)}}}{6}
+\contentsline {figure}{\numberline {1.9}{\ignorespaces Hydroid's \textit {REMUS 600} Autonomous Underwater Vehicle\textit {(Courtesy of Hydroid)}}}{6}
+\contentsline {figure}{\numberline {1.10}{\ignorespaces Boston Dynamics' \textit {Big Dog} is an autonomous robot that helps carry heavy supplies across rough terrain like a mule. \textit {(Courtesy of Boston Dynamics)}}}{7}
+\contentsline {figure}{\numberline {1.11}{\ignorespaces iRobot's \textit {PackBot} is extremely popular in explosive ordnance disposal and other law enforcement/military applications. \textit {(Courtesy of iRobot Corporation)}}}{7}
+\contentsline {figure}{\numberline {1.12}{\ignorespaces A contender from the DARPA Grand Challenge}}{8}
+\contentsline {figure}{\numberline {1.13}{\ignorespaces Small ultrasonic sensors commonly used in hobbyist robotics}}{9}
+\contentsline {figure}{\numberline {1.14}{\ignorespaces An autonomous robot with front mounted LIDAR}}{9}
+\contentsline {figure}{\numberline {1.15}{\ignorespaces iRobot \textit {Create} mobile robot with a robotic arm \textit {Courtesy of iRobot Corportation}}}{10}
+\contentsline {figure}{\numberline {1.16}{\ignorespaces The reactive-deliberative spectrum of robotic planning. (Image recreated from \citet {arkin:behaviorbasedrobotics})}}{13}
+\contentsline {figure}{\numberline {1.17}{\ignorespaces The \textit {sense-plan-model-act} algorithm is implemented as a set of independent agents communicating information.}}{14}
+\addvspace {10pt}
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Artifacts of Intelligence}}{18}
+\addvspace {10pt}
+\contentsline {figure}{\numberline {3.1}{\ignorespaces High level view of MPFL.}}{33}
+\contentsline {figure}{\numberline {3.2}{\ignorespaces A typical MPFL schedule.}}{33}
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Planners are plugins for the MPFL compiler/runtime that define primitive capabilities of the robot.}}{35}
+\addvspace {10pt}
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Depiction of the plan instance tree for Example 4}}{49}
+\addvspace {10pt}
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Relationship between MPFL core library and client application}}{67}
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Simplified MPFL Engine}}{68}
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Each node in the plan instance tree is a context for a task}}{81}
+\contentsline {figure}{\numberline {5.4}{\ignorespaces State transition diagram of lifetime state at macrolevel}}{82}
+\contentsline {figure}{\numberline {5.5}{\ignorespaces A freshly created plan instance tree representing Example 1}}{84}
+\contentsline {figure}{\numberline {5.6}{\ignorespaces The plan instance tree from {{Figure\nobreakspace {}\G@refundefinedtrue \text {\normalfont \bfseries ??}\GenericWarning { }{LaTeX Warning: Reference `fig:ltdemooninit.png' on page 84 undefined}}} after the LST Evaluator applies an \texttt {On(READY)} state to it}}{84}
+\contentsline {figure}{\numberline {5.7}{\ignorespaces The two traversals performed by PI Evaluator on the planning graph}}{102}
+\contentsline {figure}{\numberline {5.8}{\ignorespaces Complete MPFL Engine}}{105}
+\addvspace {10pt}
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Data flow block diagram of MPFL demo}}{108}
+\contentsline {figure}{\numberline {6.2}{\ignorespaces Internals of MPFL demo client}}{109}
+\contentsline {figure}{\numberline {6.3}{\ignorespaces Example planner hierarchy}}{110}
+\contentsline {figure}{\numberline {6.4}{\ignorespaces Demo \texttt {Search} planner creates waypoints for \texttt {Transit} planner}}{123}
+\addvspace {10pt}
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Mockup of a potential MPFL Graphical Tool}}{132}

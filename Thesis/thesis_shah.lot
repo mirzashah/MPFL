@@ -1,0 +1,21 @@
+\addvspace {10pt}
+\addvspace {10pt}
+\addvspace {10pt}
+\addvspace {10pt}
+\contentsline {table}{\numberline {4.1}{\ignorespaces Primitive Plans in MPFL's MSL}}{40}
+\contentsline {table}{\numberline {4.2}{\ignorespaces Declaring Plan Instances in MSL}}{42}
+\contentsline {table}{\numberline {4.3}{\ignorespaces Type Constructor Tags in MSL}}{43}
+\contentsline {table}{\numberline {4.4}{\ignorespaces Non-\emph {Plan} Constructors in MSL}}{44}
+\contentsline {table}{\numberline {4.5}{\ignorespaces Plan Operators in MSL}}{47}
+\contentsline {table}{\numberline {4.6}{\ignorespaces \emph {DoExpression} and \emph {PlanExpression} Types MSL}}{47}
+\contentsline {table}{\numberline {4.7}{\ignorespaces ExecutePlan Constructor in MSL}}{48}
+\contentsline {table}{\numberline {4.8}{\ignorespaces Lookup Calls in MPFL MSL}}{51}
+\contentsline {table}{\numberline {4.9}{\ignorespaces Conditional expressions are of type Type{PlanExpression}}}{52}
+\contentsline {table}{\numberline {4.10}{\ignorespaces Boolean Type Values (note that $X$ can be values of types \emph {Integer}, \emph {String}, \emph {Float}, or \emph {Boolean)}}}{53}
+\contentsline {table}{\numberline {4.11}{\ignorespaces Constraint Type Values}}{55}
+\contentsline {table}{\numberline {4.12}{\ignorespaces MSL handler expression types}}{60}
+\addvspace {10pt}
+\contentsline {table}{\numberline {5.1}{\ignorespaces Meaning of lifetime states in MPFL}}{83}
+\addvspace {10pt}
+\contentsline {table}{\numberline {6.1}{\ignorespaces Determining Solution Fitness}}{112}
+\addvspace {10pt}

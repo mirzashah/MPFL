@@ -1,0 +1,804 @@
+% Chapter 4 - Master's Thesis 
+% Mirza A. Shah
+
+\chapter{A Language of Planning}
+This chapter details the special language, the \textit{Mission Specification Language (MSL)}, that not only composes the external interface of the framework, but is the foundation of the framework internal implementation.
+
+\section{The Requirements of a Language for Planning}
+The MPFL framework focuses on a particular area of autonomy development: \textit{planning}. The other components of autonomy development, (e.g. data fusion, perception, reasoning) are largely ignored though there are hooks in the framework to help a developer using MPFL integrate those components into their total autonomy solution. In MPFL, planning is articulated and reasoned about via the MSL. Before looking at the design of the MSL, it is useful to think about the requirements and features that one would like in a language to describe and encode concepts pertaining to \textit{planning}. One approach is to introspectively reflect on how we humans perform and reason about planning ourselves and how it is reflected in our own natural languages (e.g. English).
+
+In the previous chapter, an example was given describing how a human being might plan their tasks for some given day. When designing the MSL, examples like this were analyzed to determine what sort of language constructs people use to plan. These language constructs are useful in capturing the domain of autonomous robot planning and helped shape the syntax of the MSL. Some of these observations were:
+\begin{itemize}
+\item Humans use phrases like \textit{``I have to shower before I go out"}, \textit{``I have to do this task by 3:00 pm"}, \textit{``I need to go shopping for food, but cannot spend more than 40 dollars"}, and \textit{``If I finish my homework, I can watch the game tonight or read a book"}. These phrases represent \Definition{constraints} on the way we set out to achieve goals. Some of these constraints are \Definition{resource constraints} that limit a particular resource, such as time, energy, or money. Other constraints are subordinate clauses that explain relationship constraints between and across goals, such as A happens \textit{after} B, A \textit{can only happen if} B happens, and A \textit{must occur while} B is occurring.
+\item Humans break down complex goals into smaller subgoals to make it easier to reason about solving problems.\footnote{This is a feature that is common to many AI/autonomy techniques and discussed further in Chapter 7.} For example, the goal of \textit{making a cake} can be broken into goals such as \textit{create batter}, \textit{place batter in baking pan}, \textit{heat baking pan in oven}, \textit{remove baking pan from oven}, and \textit{add icing to cake}. Each of these subgoals can be broken down further to make it even easier to solve the problem. If one were to graphically depict goals and subgoals, they would form a tree.
+\item When unexpected problems occur during planning, humans try to circumvent them utilizing the path of least resistance while attempting to limit the involvement of other entities in solving said problems. For example, if a person has a headache, they do not immediately go to a neurologist to get an MRI, as that would be premature and unnecessary; more likely they will take some aspirin. If the headache persists, they may then go to their family doctor. If the family doctor cannot solve the problem, the doctor may pass the problem on to a specialist, and so on. In other words, we try to solve our problems on our own, and pass them onto outside entities only when we cannot solve them in the case we do not have enough information, skill, and/or other resources. When an outside entity cannot solve a problem, they may in turn may pass on the problem to different entity further up the chain.
+\item Humans can immediately recognize syntactic and semantic errors in sentences allow  them to recognize nonsensical or ambiguous statements. Take for example the following sentence: \textit{``There is a gas station ten hertz past the diner."} The sentence does not make sense as \textit{hertz} is not a measurement of distance, but rather of frequency. As another example, take the sentence: \textit{``I am going to make some motorcycle for lunch."} This sentence also does not make sense as \textit{motorcycle} is not a food item. Programming languages can enforce similar sanity checks enforced during syntactic and semantic analysis stages of a compiler/interpreter.
+\end{itemize}
+
+These observations were important in designing MPFL's language of planning and are incorporated into the constructs the language provides.
+
+\section{The MPFL Mission Specification Language}
+The language that constitutes the foundation of the MPFL framework is known as the \Definition{MPFL Mission Specification Language (MSL)}. This language is what is used to \textit{specify the missions} the robot is to perform -- hence the name. Users of the robot encode the goals they want their robot to achieve along with any constraints in an MSL program. The MPFL compiler/runtime will then process this specification and attempt to help the robot achieve the specified goals.
+
+\subsection{Language Overview}
+The MSL is a strongly, statically typed domain-specific programming language encompassing the domain of mission planning in AUVs. The language is highly declarative with very little imperative control. The concept of \emph{verification} is extremely important in the MPFL world; the compiler verifies as much as it can statically before runtime, and whatever cannot be statically checked is continuously verified during runtime. Programs written in the MSL are contained within a single file, though breaking up a specification into multiple files could be achieved easily by employing a simple preprocessor such as the one used in C compilers. 
+
+The grammar of the language is defined by an \textit{LALR(1)} grammar with a simple and consistent syntax. Parentheses are used extensively and represent block constructs in the language. White spaces, newlines, and tabs have no significance in the language and are ignored. One will notice that the syntax of the language is heavily influenced by variant types found in functional languages, namely \textit{ML}. The grammar is specified later in the chapter.
+
+\subsection{Plans and Plan Instances}
+The primary construct in the MSL is called a \Definition{plan}. A plan represents a set of goals and their corresponding constraints. The MSL has a set of built-in plans called \Definition{primitive plans} and allows users to create their own plans called \Definition{user-defined plans}.
+
+The primitive plans represent the most basic capabilities of the robot; each encapsulating a singular goal. The MSL's current set of primitive plans is built specifically for \Definition{autonomous underwater vehicles (AUVs)} but can easily be extended to serve a broader range of autonomous robots. The currently-available primitive plans in the MSL are described in \RefTable{primitivePlanInstances}.
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|l|l|}
+\hline \textbf{Primitive Plan} & \textbf{Description}\\
+\hline \Code{Search} & Searches a specified area using an onboard sensor\\ 
+\hline \Code{UseSonar} & Activates an onboard sonar device\\ 
+\hline \Code{UseModem} & Activates an onboard acoustic modem device\\ 
+\hline \Code{Transit} & Requests the vehicle to move through a set of waypoints\\ 
+\hline \Code{PhoneHome} & Sends status and sensory reports back to a command ship or station\\ 
+\hline \Code{Loiter} & Tells the vehicle to sit at a position and do nothing\\ 
+\hline \Code{UseAutopilot} & Requests the vehicle's autopilot to move to a waypoint\\
+\hline \Code{UseAcoustic} & Requests allocation of the acoustic channel\\  
+\hline 
+\end{tabular} 
+\caption{Primitive Plans in MPFL's MSL} \label{tbl:primitivePlanInstances}
+\end{table}
+\subsubsection{Plan is a Type}
+In the MSL, \Type{Plan} is a built-in MSL type. Recall \textit{types} are tags ascribed to values in a language restricting the usage of those values primarily for the purpose of safety and correctness \citep{pierce:types}.  All of the primitive plans mentioned in \RefTable{primitivePlanInstances} are values which can be used in the MSL whereever a \Type{Plan} is expected (i.e. \Type{Plan} is a \Definition{variant type}\footnote{A \Definition{variant type} (also known as a \Definition{set type}, \Definition{tagged union} or \Definition{discriminated union}), is a value representing a value that could take on several different, but fixed types. The value is typically represented as a tag along with some typed value.} which can take one of the values from \RefTable{primitivePlanInstances}). Values of type \Type{Plan} are called \Definition{plan instances}. \Type{Plans} describe tasks, whereas \textit{plan instances} refer to an actual instance of a task. Another way of thinking about it is the difference between a \textit{class} and an \textit{object} in an object-oriented language;  \textit{an object is an instance of a class}. Likewise in the MSL, a \textit{plan instance is an instance of a plan}. For example, if one wants the robot to move to some waypoint using the MSL, it can be achieved by creating a plan instance of the \Type{Plan} variant type value \Code{UseAutopilot} depicted by the following code segment:
+
+\begin{verbatim}
+UseAutopilot goToPoint(Destination = GeoPosition(Lat = Degrees(32.0),
+                                           Lon = Degrees(-122.0),
+                                           Depth = Meters(10.0)))
+\end{verbatim}
+\CodeCaption{1}{Declaration of a \Code{UseAutopilot} plan instance}\\
+
+In Example 1, we create a plan instance representing the primitive plan \Code{UseAutopilot} with the identifier \Code{goToPoint}. Following the identifier is a list of parameters enclosed in parentheses. This is referred to as the \Definition{plan instance constructor}. This constructor describes the input parameters for the task represented by the plan instance. In the case of the example above, there is one parameter: \Code{Destination}. Hence, the instance \Code{goToPoint} represents transiting to a geographical position of $32^{\circ}$ N, $122^{\circ}$ W, and a depth of 10 meters.
+
+\subsubsection{Plan Instance Constructors and Other Types}
+Every type of primitive plan in MPFL has a constructor associated with it. Each constructor is different for each primitive plan. For example, the \Code{Search} plan takes parameters such as the area to be searched and the sensor to utilize within the search. Each type of plan may have more than one constructor, allowing several ways to define the problem parameters.  \RefTable{planconstructors} gives the complete syntax for plan instances declarations along with their constructors. Note that values with bars over them (e.g. \Metatype{integer}) refer to the \Definition{metatypes} used in the implementation language (typically referred to as the \Definition{metalanguage}) for the MPFL compiler.
+            
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}                        
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.1cm}|p{2.0cm}|p{9cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{Loiter} & \Type{Plan} & \Code{Loiter \BrackType{\Metatype{string}}(LoiterPosition = \BrackType{Position} LoiterDuration = \BrackType{Duration})}\\
+\hline \Code{PhoneHome} & \Type{Plan} & \Code{PhoneHome \BrackType{\Metatype{string}}(CommDeviceName = \BrackType{String}, PhoneHomeRate = \BrackType{Frequency}}\\
+\hline \Code{Search} & \Type{Plan} & \Code{Search \BrackType{\Metatype{string}}(SonarName= \BrackType{String}; SearchArea = \BrackType{Area}, LaneWidth = \BrackType{Length})}\\
+\hline \Code{Transit} & \Type{Plan} & \Code{Transit \BrackType{\Metatype{string}}(Waypoints = \BrackType{Position}, \BrackType{Position}, ...)}\\
+\hline \Code{UseAcoustic} & \Type{Plan} & \Code{UseAcoustic \BrackType{\Metatype{string}}(AcousticDeviceName = \BrackType{String}, StartTime = \BrackType{Time}, EndTime = \BrackType{Time}, TaskDuration = \BrackType{Duration}, MinGap = \BrackType{Duration}, MaxGap = \BrackType{Duration})}\\
+\hline \Code{UseAutopilot} & \Type{Plan} & \Code{UseAutopilot \BrackType{\Metatype{string}}(Destination = \BrackType{Position}})\\
+\hline \Code{UseModem} & \Type{Plan} & \Code{UseModem \BrackType{\Metatype{string}}(ModemName = \BrackType{String},  ModemMessage = \BrackType{String})}\\
+\hline \Code{UseSonar} & \Type{Plan} & \Code{UseSonar \BrackType{\Metatype{string}}(SonarName = \BrackType{String}, PingRate = \BrackType{Frequency})}\\
+\hline
+\end{tabular} 
+\caption{Declaring Plan Instances in MSL} \label{tbl:planconstructors}
+\end{table}
+}
+
+Every constructor requires each parameter to be named (in the case of Example 1 only one parameter called \Code{Destination} is required for a \Code{UseAutopilot} constructor) followed by an `=', followed by the value. Each parameter name/value pair separated by a comma. The value in each pair has type associated with it. In Example 1, the expected parameter type for the value of the field name \Code{Destination} is the MSL type \Type{Position}. 
+
+Besides the \Type{Plan} type, the MSL has many types built into it (such as \Type{Position}). The majority of these remaining types are used for encoding the parameter values in plan instance constructors. All of these types are variant types, which can take one value from a discrete set of differently-typed values described by their own constructors. \RefTable{types} describes the majority of types in the language along with the different values they can take (either a constructor, an expression consisting of a binary operator, or a primitive value such as an integer or string) without the constructor. \RefTable{allconstructors} give the complete syntax for these types in the language along with their corresponding type constructors. Besides constructors, there are also \Definition{operators} that can be used to create typed expressions. All of the MSL operators are binary and use infix notation. These are also included in \RefTable{allconstructors} and can be thought of as special constructors where the operator is the constructor tag and the two operands are parameters. The remaining types in the language will be defined as needed.
+
+A \Type{Position} can take on several values such as the value \Code{GeoPosition} which refers to an absolute geographical position (i.e. latitude/longitude). \Code{GeoPosition}, just like a plan instance, has a constructor. The \Code{GeoPosition} constructor consists of a latitude (parameter name \Code{Lat}), longitude (parameter name \Code{Lon}), and a depth (parameter name \Code{Depth}), which must be passed into its constructor, where each of these parameters also has to be named, following an `=' with the respective value on the right. \Code{Lat} and \Code{Lon} have to be defined as values of the MSL variant type \Type{Angle} which can take a value of \Code{Degrees}. Depth requires a value of MSL variant type \Type{Length}, which can take a value of \Code{Meters}. Notice the constructors \Code{Degrees} and \Code{Meters} simply take a number, indicating a terminal type constructor. 
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3cm}|p{10cm}|}
+\hline \textbf{Types} & \textbf{Values} \\
+\hline \Type{Angle}& \Code{Degrees, Radians}  \\ 
+\hline \Type{Area} & \Code{RectangularArea, CircularArea, PolygonalArea}\\ 
+\hline \Type{Boolean} & \Code{\Metatype{boolean}, $>=$,$==$,$!=$,$<=$,$<$,$>$, LookupBoolean}\\  
+\hline \Type{Constraint} & \Code{TimeConstraint, PowerConstraint}\\
+\hline \Type{Duration} & \Code{Seconds, Minutes, Hours}\\ 
+\hline \Type{Energy} & \Code{Joules, KilowattHours}\\ 
+\hline \Type{Float} & \Code{\Metatype{float},$+$, $-$, $/$, $*$, LookupFloat}\\
+\hline \Type{Frequency} & \Code{Hertz, Kilohertz}\\ 
+\hline \Type{Integer} & \Code{\Metatype{integer}, $+$, $-$, $/$, $*$, LookupInteger}\\
+\hline \Type{Length} & \Code{Feet, Meters, Yards}\\ 
+\hline \Type{Plan}& \Code{Loiter, PhoneHome, Search, UseAcoustic, UseAutopilot, UseModem, UseSonar, ExecutePlan}\\
+\hline \Type{Position} & \Code{GeoPosition, RelativePosition}\\ 
+\hline \Type{Power} & \Code{Watts, Kilowatts, Horsepower}\\  
+\hline \Type{String} & \Code{\Metatype{string}, LookupString}\\  
+\hline \Type{Time} & \Code{UnixTime, DHMSMTime}\\  
+\hline 
+\end{tabular} 
+\caption{Type Constructor Tags in MSL} \label{tbl:types}
+\end{table}
+}
+
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.1cm}|p{2.0cm}|p{9cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{Degrees} & \Type{Angle} & \Code{Degrees(\BrackType{Float})}\\
+\hline \Code{Radians} & \Type{Angle} & \Code{Radians(\BrackType{Float})}\\
+\hline \Code{RectangularArea} & \Type{Area} & \Code{RectangularArea(TopLeft = \BrackType{Position}, BottomRight = \BrackType{Position})}\\
+\hline \Code{CircularArea} & \Type{Area} & \Code{CircularArea(CenterOfArea = \BrackType{Position}, Radius = \BrackType{Length})}\\
+\hline \Code{PolygonalArea} & \Type{Area} & \Code{PolygonalArea(BoundaryPoints = \BrackType{Position}, \BrackType{Position}, ...)}\\
+\hline \Code{TimeConstraint} & \Type{Constraint} & \Code{TimeConstraint \BrackType{String}(\BrackType{Time} $<=$ StartTime $<=$ \BrackType{Time}, \BrackType{Time} $<=$ EndTime $<=$ \BrackType{Time})}\\
+\hline \Code{PowerConstraint} & \Type{Constraint} & \Code{PowerConstraint \BrackType{String}(MaxPowerLevel = \BrackType{Power}, MaxEnergyToUse = \BrackType{Energy})}\\
+\hline \Code{Seconds} & \Type{Duration} & \Code{Seconds(\BrackType{Float})}\\
+\hline \Code{Minutes} & \Type{Duration} & \Code{Minutes(\BrackType{Float})}\\
+\hline \Code{Hours} & \Type{Duration} & \Code{Hours(\BrackType{Float})}\\
+\hline \Code{Joules} & \Type{Energy} & \Code{Joules(\BrackType{Float})}\\
+\hline \Code{KilowattHours} & \Type{Energy} & \Code{KilowattHours(\BrackType{Float})}\\
+\hline \Code{Hertz} & \Type{Frequency} & \Code{Hertz(\BrackType{Float})}\\
+\hline \Code{Feet} & \Type{Length} & \Code{Feet(\BrackType{Float})}\\
+\hline \Code{Meters} & \Type{Length} & \Code{Meters(\BrackType{Float})}\\
+\hline \Code{Yards} & \Type{Length} & \Code{Yards(\BrackType{Float})}\\
+\hline \Code{AbsolutePosition} & \Type{Position} & \Code{AbsolutePosition(Lat = \BrackType{Angle}, Lon = \BrackType{Angle}, Depth = \BrackType{Length})}\\
+\hline \Code{RelativePosition} & \Type{Position} & \Code{RelativePosition(Center = \BrackType{AbsolutePosition}, X = \BrackType{Float}, Y = \BrackType{Float}, Z = \BrackType{Float})}\\
+\hline \Code{Watts} & \Type{Power} & \Code{Watts(\BrackType{Float})}\\
+\hline \Code{Horsepower} & \Type{Power} & \Code{Horsepower(\BrackType{Float})}\\
+\hline \Code{ClockTime} & \Type{Time} & \Code{ClockTime(Day = \BrackType{Integer;}, Time = \BrackType{Integer}::\BrackType{Integer}::\BrackType{Integer})}\\
+\hline \Code{UnixTime} & \Type{Time} & \Code{UnixTime(UTCSeconds = \BrackType{Float})}\\
+\hline
+\end{tabular} 
+\caption{Non-\Type{Plan} Constructors in MSL} \label{tbl:allconstructors}
+\end{table}
+
+
+
+\subsubsection{Explicit Parameter Naming and Unit Specification}
+The reader may have noticed that the syntax in constructors is unusually verbose. The MSL is designed to ensure there is no ambiguity in what the user wants to do and accomplishes this through a very strong type system. Again one of the central tenets of MPFL is providing as much automated verification as possible. When software is running on an extremely expensive vehicle alone in the middle of the ocean potentially for months, a single incorrect value could cause severe problems such as mission failure or the damaging/destruction of the vehicle. By specifying all parameters within a constructor along with their units where applicable, trivial mistakes are avoided.
+
+\subsection{User-defined Plans}
+Plan instances have to be declared within an MSL language construct called a \Definition{user-defined plan}. User-defined plans allow a user to extend the set of built-in primitive \Type{Plans} with their own. User-defined plans are similar to primitive plans in the sense that they represent some sort of task/goal description. The difference is that primitive plans represent a singular goal whereas user-defined plans are composed of several primitive plan instances as well as plan instances of other user-defined plans. User-defined plans are the primary construct for abstraction and encapsulation in the MSL and allow a user to organize their missions in a logical way. User-defined plans, like primitive plans, have the type \Type{Plan}. 
+
+\subsubsection{User-defined Plan Syntax}
+User-defined plans have the following basic syntax
+\begin{verbatim}
+Plan <plan identifier>
+(
+    <plan instance declaration 1>
+    <plan instance declaration 2>
+    ...
+    <plan instance declaration n>
+    
+    Do(<plan expression>)
+)
+\end{verbatim}
+
+An example of a very simple user-defined plan taking from Example 1 is as follows:
+\begin{verbatim}
+Plan doStuff
+(
+   UseAutopilot goToPoint(Destination = GeoPosition(Lat = Degrees(32.0),
+                                                    Lon = Degrees(-122.0),
+                                                    Depth = Meters(10.0)))   
+   Do(goToPoint)                                       
+)
+\end{verbatim}
+\CodeCaption{2}{A user-defined plan in the MSL consisting of a single goal}\\
+
+Example 2 depicts a complete MSL program consisting of a singular goal (depicted by the \Code{UseAutopilot} plan instance \Code{goToPoint}) to reach a waypoint. If one were to save this plan to a text file and feed it to the MPFL runtime, the robot would go to the waypoint specified. 
+
+The final part of the plan declaration is the keyword \Code{Do} followed by some expression. This part of the plan is known as the \Definition{Do Expression} and contains within it an expression describing the temporal relationships and constraints for goals (i.e. plan instances) defined within a user-defined plan. The example above is rather trivial so we need to expand on the example.
+
+\subsubsection{Do Expression and Plan Operators}
+Example 3 expands Example 2 by adding in three more goals:
+\begin{verbatim}
+Plan doStuff
+(
+   UseAutopilot goToPoint(Destination = GeoPosition(Lat = Degrees(32.0),
+                                                    Lon = Degrees(-122.0),
+                                                    Depth = Meters(10.0)))   
+   Search lookForThreats(
+             SonarName = sideSonar,
+             SearchArea = RectangularArea(
+                             TopLeft     = GeoPosition(Lat = Degrees(32.231),
+                                                       Lon = Degrees(-122.112),
+                                                       Depth = Meters(0.0)),
+                             BottomRight = GeoPosition(Lat = Degrees(32.231),
+                                                       Lon = Degrees(-122.112),
+                                                       Depth = Meters(0.0))),
+            LaneWidth = Meters(100))
+            
+   PhoneHome reportStatus(CommDeviceName = benthos100, PhoneHomeRate = Hertz(0.01))
+   
+   Loiter waitForPickup(LoiterPosition = GeoPosition(Lat = Degrees(-32.93), 
+                                                     Lon = Degrees(-121.991)
+                                                     Depth = Meters(0.0)),
+                        LoiterDuration = Hours(5.5))                                                        
+                                                     
+   Do(goToPoint > (lookforThreats || reportStatus) > waitforPickup)                                       
+)
+\end{verbatim}
+\CodeCaption{3}{A user-defined plan in the MSL consisting of multiple goals}\\
+
+The Do Expression in this plan is more complicated.  The expression contained within the \Code{Do} constructor represents a relationship between various plan instances (i.e. tasks). Each plan instance is referenced via its identifier. The angle bracket (\Code{$>$}) represents a \Definition{serial operator}, meaning that the task on the left-hand side of the $>$ must finish before the task on the right-hand side can begin. In Example 3, the plan instance \Code{goToPoint} must complete before \Code{lookForThreats} and \Code{reportStatus}, which both in turn must finish before \Code{waitForPickup} can commence. The two bars (\Code{||}) between \Code{lookForThreats} and \Code{reportStatus} is known as the \Definition{parallel operator} indicating that \Code{lookForThreats} and \Code{reportStatus} must execute in parallel. These operators are referred to in the MSL as \Definition{planning operators}. The MSL has several planning operators that can be used in the Do Expression depicted in \RefTable{planoperators}. These operators are left associative, but can be grouped using parentheses as well. The MPFL compiler verifies that all references within the Do Expression are valid identifiers with corresponding plan instance declarations within the user-defined plan. If the references are invalid it will result in a compile-time error.
+
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{4cm}|p{10cm}|}
+\hline \textbf{Plan Operator} & \textbf{Meaning}\\
+\hline \Code{Serial (a > b)} & Execute task \textit{b} if and only if task \textit{a} is complete.\\ 
+\hline \Code{Parallel (a || b)} & Execute task \textit{a} and \textit{b} in parallel. Once either task is started, the other must be forced to start as well.\\ 
+\hline \Code{Group (a \& b)} & Execute both tasks \textit{a} and \textit{b}, however there is no dependency between the two (in contrast to the parallel operator), and both do not need to run at the same time.\\ 
+\hline \Code{Exclusive Or (Xor) (a \^{} b)} & Execute either task \textit{a} or task \textit{b}, but execute exactly only one of them. Give task \textit{a} priority over task \textit{b}.\\ 
+\hline 
+\end{tabular} 
+\caption{Plan Operators in MSL} \label{tbl:planoperators}
+\end{table}
+
+The Do Expression is a typed value in the language of type \Type{DoExpression}. The expression inside of the Do Expression has a different type \Type{PlanExpression}. In \RefTable{doandplanexpconstructor}, we add to the list of types and type constructors from \RefTable{types} and \RefTable{allconstructors}.
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.0cm}|p{3.0cm}|p{8cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{Do} & \Type{DoExpression} & \Code{Do(\BrackType{PlanExpression})}\\
+\hline \Code{operator $>$} & \Type{PlanExpression} & \Code{\BrackType{PlanExpression} $>$ \BrackType{PlanExpression})}\\
+\hline \Code{operator ||} & \Type{PlanExpression} & \Code{\BrackType{PlanExpression} ||  \BrackType{PlanExpression})}\\
+\hline \Code{operator \&} & \Type{PlanExpression} & \Code{\BrackType{PlanExpression} \& \BrackType{PlanExpression})}\\
+\hline \Code{operator \^{}} & \Type{PlanExpression} & \Code{\BrackType{PlanExpression} \^{} \BrackType{PlanExpression})}\\
+\hline \Code{plan instance identifier} & \Type{PlanExpression} & \BrackType{string}\\
+\hline
+\end{tabular} 
+\caption{\Type{DoExpression} and \Type{PlanExpression} Types MSL} \label{tbl:doandplanexpconstructor}
+\end{table}
+}
+
+Here are some examples of more complex Do Expressions using the operators from \RefTable{planoperators}:
+\begin{enumerate}
+\item \Code{Do(moveAround || sendStatusHome > goHome > stayPut)} - This example wants us to do the tasks \Code{moveAround} and \Code{sendStatusHome} in parallel, followed by the task
+\Code{goHome}, then followed by the task \Code{stayPut}.
+\item \Code{Do(((a $>$ b) \^{} (c || d)) || e)} - This example wants us to either do the tasks \Code{a} followed by \Code{b}, OR do the tasks \Code{c} and \Code{d} in parallel (only one or the other). While it is doing all of that, it wants to do task \Code{e} in parallel.
+\item \Code{Do(a \& ((b \& c) $>$ d))} - This example wants to group the task \Code{a} with the following task: do \Code{b} and \Code{c} together, not necessarily in parallel. Once \Code{b} and \Code{c} are complete, then and only then, perform task \Code{d}.
+\end{enumerate}
+
+We can see from these examples that one can create significantly complex temporal relationships between the tasks needed to be done by the AUV. An important note about the Do Expression is that one is not allowed to reference a plan instance in the expression more than once.
+
+\subsubsection{Creating Plan Instances from User-Defined Plans}
+The kind of plan instances we have created so far are instances of the various primitive plans built into the language. Creating a user-defined plan results in extension of the set of valid values constituting the variant type \Type{Plan}.  We can create instances of user-defined plan types by using the special plan instance constructor: \Code{ExecutePlan} (see \RefTable{executeplanconstructor}). 
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.1cm}|p{2.0cm}|p{9cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{ExecutePlan} & \Type{Plan} & \Code{ExecutePlan(UserPlanName = \BrackType{String})}\\
+\hline
+\end{tabular} 
+\caption{ExecutePlan Constructor in MSL} \label{tbl:executeplanconstructor}
+\end{table}
+}
+
+We can extend Example 3 with another plan that creates an instance of a user-defined plan as shown here:
+
+\begin{verbatim}
+Plan doStuff
+(
+    ...
+    Do(goToPoint > (lookforThreats || reportStatus) > waitforPickup)                                       
+)
+
+Plan master
+(
+    Loiter waitForMissionStart(LoiterPosition = GeoPosition(Lat = Degrees(-32.44), 
+                                                            Lon = Degrees(-122.213)
+                                                            Depth = Feet(0.0)),
+                              LoiterDuration = Hours(5.5))                                                                                                              
+                              
+    ExecutePlan primaryMission(UserPlanName = doStuff)
+	
+    Do(waitForMissionStart > primaryMission)	
+)
+\end{verbatim}
+\CodeCaption{4}{Creating an Instance of a User-Defined Plan}\\
+
+The \Code{ExecutePlan} constructor takes the identifier of a previously declared (i.e. higher up) user-defined plan. The plan instance created with \Code{ExecutePlan} is an instance of the user-defined plan and like all primitive plan instances also has the type \Type{Plan}. In Example 4, we create a plan instance with user-defined plan \Code{doStuff} (which we declared in Example 3), called \Code{primaryMission}. Note that whenever the `...' notation is used (as in \Code{Plan doStuff}), it refers to omitted, \textit{don't care} code that is not shown for the sake of brevity. The plan instance \Code{primaryMission} acts just like any primitive plan instance now, but represents the aggregate of multiple plan instances. 
+
+\subsubsection{The Sortie Plan Instance and Children Plan Instances}
+MPFL internally creates a single plan instance of the last user-defined plan in the MSL program known as the \Definition{sortie plan instance}\footnote{The term \textit{sortie} comes from military terminology and refers to the deployment of a single military unit. In the MSL, the sortie plan instance is a representation of what the robot is to do during its deployment -- hence the name.}. The ability to create plan instances of user-defined plans results in the creation of a tree structure, which internally within MPFL, is known as the \Definition{plan instance tree} with a root node of the \emph{sortie} instance. In the case of Example 4, think of it as having two additional imaginary lines of code after the last user-defined plan:
+\begin{verbatim}
+ExecutePlan sortie(UserPlanName = master)
+Do(sortie)
+\end{verbatim}
+
+\InsertPicture{firsttree.png}{0.3}{Depiction of the plan instance tree for Example 4}
+
+\RefPicture{firsttree.png} graphically depicts the tree, also encoding the planning operators. The plan instance tree contains within it all plan instances declared within the program. In the example, the sortie plan instance has two children \Code{waitForMissionStart} and \Code{primaryMission}. As \Code{waitForMissionStart} is a primitive plan instance (\Code{Loiter}), it is a leaf node in the plan instance tree. However, \Code{primaryMission} is an instance of the \Code{doStuff} user-defined plan, meaning that it is a non-leaf. As intuition suggests, \Code{primaryMission} has four leaf children: \Code{goToPoint, lookforThreats, reportStatus,} and \Code{waitForPickup}. 
+
+\subsubsection{Multiple Instances of User-Defined Plans}
+User-defined plan types behave just like primitive plan types. Multiple plan instances of these types can be created both within and across different plans. In Example 4, it would be perfectly acceptable to create more than one instance of a \Code{doStuff} user-defined plan with the caveat that the identifiers have to be unique within the enclosing user-defined plan declaration.
+
+\subsubsection{Circular Dependencies}
+In order to create an instance of a user-defined plan, the MSL requires the user-defined plan to already be declared. This means it is not possible to create a circular dependency.
+
+\subsection{Run-time Value Lookups}
+Once MPFL commences, it is not possible to modify the mission specification written in the MSL. This is extremely limiting as many of the parameters used within various type constructors may not be known until runtime. To get around this limitation, the MSL contains a set of built-in functions that can lookup external values from a \textit{knowledge base} (explained more in the next chapter) that can be substituted as needed during runtime.
+
+For example, we can modify Example 1 so that the latitude and longitude are dynamically loaded from the knowledge base:
+
+\begin{verbatim}
+UseAutopilot goToPoint(Destination = GeoPosition(
+                                      Lat = Degrees(LookupFloat(myLatitude)),
+                                      Lon = Degrees(LookupFloat(myLongitude)),
+                                      Depth = Meters(10.0)))
+\end{verbatim}
+\CodeCaption{5}{A \Code{UseAutopilot} plan instance with dynamic lookup}\\
+
+In this example, the \Code{Degrees} constructors corresponding to the latitude and longitude takes a \Code{LookupFloat} value instead of a hard-coded number. Internally within MPFL, whenever the value is queried for \Code{goToPoint}'s destination latitude or longitude, it will be looked up. The parameters within parentheses following \Code{LookupFloat} refers to a \Definition{key} (which is simply a \Type{String} value) that is used by MPFL to find the appropriate value. The user must be aware of what keys are available while writing their specification and their corresponding types. There are currently only four different \Code{Lookup*} calls for the most primitive types, but more will be added for all the types specified in \RefTable{types}. The lookup calls are described in \RefTable{lookupcalls}.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline \textbf{MSL Type} & \textbf{Lookup Callname} \\
+\hline \Type{Boolean} & \Code{LookupBoolean}\\ 
+\hline \Type{Integer} & \Code{LookupInteger}\\ 
+\hline \Type{Float} & \Code{LookupFloat}\\ 
+\hline \Type{String} & \Code{LookupString}\\ 
+\hline 
+\end{tabular} 
+\caption{Lookup Calls in MPFL MSL} \label{tbl:lookupcalls}
+\end{table}                                               
+
+Note that the lookup calls are typed expression so wherever a value of one of the types in \RefTable{lookupcalls} is needed, it can be substituted with the corresponding lookup call. For example, because the parameter represented the key for all the lookup calls is of type \Type{String}, we can nest another \Code{LookupString} within the original \Code{LookupFloat} call we issued to determine the key as shown in Example 6:
+
+\begin{verbatim}
+UseAutopilot goToPoint(Destination = GeoPosition(
+                                      Lat = Degrees(LookupFloat(LookupString(foobar))),
+                                      Lon = Degrees(LookupFloat(myLongitude)),
+                                      Depth = Meters(10.0)))                                           
+\end{verbatim}
+\CodeCaption{6}{Nested dynamic lookup calls}\\
+
+\subsubsection{An Important Note on the Safety of Lookup Calls}
+Even though lookup calls are type safe, their use can be dangerous for the following reasons:
+\begin{itemize}
+\item Since the lookup is done in a lazy fashion, it is not evaluated until needed. This means range checking cannot be performed on lookup values the way it can on literal values. For example, a latitude of 800 does not make sense as the value must fall between -90 and 90. The MPFL compiler verifies all literal values so such an error would not occur if a latitude was hardcoded.
+\item Lookup calls do not necessarily refer to constant values, rather they typically refer to dynamic values that change with time (as is their purpose). Hence the behavior of the AUV maybe more difficult to predict. 
+\item If the key is not defined in the knowledge base (described in the next chapter), it will cause the MPFL runtime to throw an exception indicating error. 
+\end{itemize}
+All-in-all, this issue really cannot be avoided in any [interesting] computer program written in any language. The user is just advised to be careful when using lookup calls, and to use them sparingly as possible.
+
+\subsection{Conditional Expressions}
+Besides the planning operators, users can use \Definition{conditional expressions} within their Do Expression. This gives users more control over how the tasks they want their AUV to accomplish are executed, in contrast to having the MPFL runtime make the decisions. The conditional expression looks similar to the \emph{if-then-else-endif} structure found across many programming languages and has type \Type{PlanExpression} so that it can be used within a Do Expression. We can expand \RefTable{doandplanexpconstructor} with an additional entry which is conveyed in \RefTable{conditionalconstructor}.
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.0cm}|p{3.0cm}|p{8cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{If Then Else Endif} & \Type{PlanExpression} & \Code{if(\BrackType{Boolean}) then (\BrackType{PlanExpression}) else (\BrackType{PlanExpression}) endif}\\
+\hline
+\end{tabular} 
+\caption{Conditional expressions are of type Type{PlanExpression}} \label{tbl:conditionalconstructor}
+\end{table}
+}
+
+The subexpression for each branch can be any value of type PlanExpression including another conditional expression or values of type \Type{PlanExpression} in \RefTable{doandplanexpconstructor}. Unlike conditional expressions in most languages, the MSL conditional expression requires the definition of both branches (i.e. each conditional expression has an \Code{else} block).
+
+\subsubsection{Meaning of Conditional Expression}
+The purpose of conditional expressions is to allow users to make decisions about the makeup of their Do Expression. If the condition in the conditional expression is true, the expression reduces to \Type{PlanExpression} in the first branch, otherwise it reduces to the expression in the second (i.e. \Code{else}) branch. The unused branch is thrown away.
+
+Example 7 below gives us a simple user-defined plan with a conditional expression:
+
+\begin{verbatim}
+Plan
+(
+    Transit a(...)
+    Search b(...)
+    PhoneHome c(...)
+    Loiter d(...)    
+    Loiter e(...)
+    
+    Do(a > (if(LookupFloat(EnergyLeftInHours) > 20)(b || c) else (d ^ e) endif))
+)
+\end{verbatim}
+\CodeCaption{7}{Example of a conditional expression within the Do expression}\\
+
+In Example 7, we have the plan instance \Code{a} which refers to a \Code{Transit} plan instance on the left side of a serial ($>$) operator with a conditional expression on the right-hand side. The condition determines if a looked up value of type \Code{float} with key \Code{EnergyLeftInHours} is greater than 20. If during runtime the condition is true, the entire expression reduces to:
+
+\begin{center}
+\Code{Do(a $>$ (b || c))}\\
+\end{center}
+
+\begin{flushleft}
+Likewise if the condition is false, the result is:\\
+\end{flushleft}
+
+\begin{center}
+\Code{Do(a $>$ (d \^{} e))}\\
+\end{center}
+
+\subsubsection{Fluctuation of Condition}
+Recall that lookup values are not necessarily constant and are lazily evaluated. In the case that the condition in the expression changes between compilations, it may result in a changing resulting Do Expression. In the case of Example 7, it may turn out that in the beginning, the value of \Code{LookupFloat(EnergyLeftInHours)} is indeed greater than 20 causing \Code{b} and {c} to occur in parallel after \Code{a} is completed. However, it could turn out that while \Code{b||c} are being executed, the value of the lookup is less than or equal to 20 (likely due to lack of residual energy as implied by the key). This causes \Code{d\^{}e} to pop into the mix, even though \Code{b} and \Code{c} have partially been attempted or perhaps even been completed already. The user of MPFL must be wary of this fluctuating condition phenomenon and should plan for that in their mission specification.
+
+\subsubsection{Defining the Condition}
+As the condition within the conditional expression can be any expression of type \Type{Boolean}, any value of this type can be used for the condition. We saw in \RefTable{types} that values of the \Type{Boolean} type can be defined in several ways. \RefTable{booleanvalues} shows the different ways one can construct the condition of a conditional expression. Users can compare values for equality, inequality, greater than, greater than and equal, less than, and less than or equal to for the four core primitive types (\Type{Boolean}, \Type{String}, \Type{Integer}, \Type{Float}).
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.0cm}|p{3.0cm}|p{8cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Metatype{boolean} & \Type{Boolean} & \Code{true, false}\\
+\hline LookupBoolean & \Type{Boolean} & \Code{LookupBoolean(\Type{String}})\\
+\hline $ >= $ & \Type{Boolean} & \Code{\BrackType{$X$} $>=$ \BrackType{$X$}}\\
+\hline $ > $ & \Type{Boolean} & \Code{\BrackType{$X$} $>$ \BrackType{$X$}}\\
+\hline $ == $ & \Type{Boolean} & \Code{\BrackType{$X$} $==$ \BrackType{$X$}}\\
+\hline $ != $ & \Type{Boolean} & \Code{\BrackType{$X$} $!=$ \BrackType{$X$}}\\
+\hline $ <= $ & \Type{Boolean} & \Code{\BrackType{$X$} $<=$ \BrackType{$X$}}\\
+\hline $ < $  & \Type{Boolean} & \Code{\BrackType{$X$} $<$ \BrackType{$X$}}\\
+\hline
+\end{tabular} 
+\caption{Boolean Type Values (note that $X$ can be values of types \Type{Integer}, \Type{String}, \Type{Float}, or \Type{Boolean)}} \label{tbl:booleanvalues}
+\end{table}
+}
+
+\subsubsection{Pitfalls of Conditional Expressions}
+Even though conditional expressions are quite powerful and useful, their use should be avoided. Conditional expressions are imperative (in contrast to declarative) constructs that move responsibility away from the MPFL runtime into the hands of the user. However, this deviates from the intention of the MSL. The goal of the MSL and MPFL runtime is to allow users to not focus too much on \textit{how} the tasks are to be executed, but rather \emph{what} tasks need to be executed. Regardless, conditional expressions cannot be avoided all-together as fine-grained control maybe required, but keep in mind that they might not be necessary in order to accomplish the robot's goal. In the case of Example 7, rather than using a conditional, an alternative might be to replace it instead with with an exclusive or (\^{}):\\
+\begin{center}
+\Code{Do(a $>$ ((b || c) \^{} (d \^{} e)))}\\
+\end{center}
+
+\begin{flushleft}
+MPFL would \emph{figure out} how to best execute the mission, attempting to accomplish \Code{b||c}, but resorting to \Code{(d\^{}e)} only if necessary. However, the user does not have fine-grained control over how that exclusive or (i.e. \Code{d \^{} e}) decision is made.
+\end{flushleft}
+
+\subsection{Declaring and Binding Constraints}
+The MPFL language is a constraint-based language. Users define problems as a series of declarative tasks that are bound by certain rules, namely the planning operators specified in the Do Expression, as well as the problem definition that is passed in the constructor of each plan instance. The language runtime is responsible for solving the problems based on these constraints. The MPFL language takes this a step further by creating stand-alone constraints that can be bound to plan instances referenced in the Do Expression. To illustrate, here is an example:
+
+\begin{verbatim}
+Plan anExample
+(
+    UseSonar a(...)
+    Search b(...)
+    Loiter c(...)
+
+    TimeConstraint timeLimit(ClockTime(Days=0, Time=19::00::00) <= StartTime <= 
+	                         ClockTime(Days=0, Time=20::00::00), 
+	                         ClockTime(Days=1, Time=19::00::00) <= EndTime <= 
+	                         ClockTime(Days=1, Time=21::30::00))
+	                         
+    Do(a & (b with timeLimit) > c)
+)
+\end{verbatim}
+\CodeCaption{8}{Binding a constraint within the Do Expression}\\
+
+In this example, we construct a \Code{TimeConstraint} value with identifier \Code{timeLimit}. This value has type \Type{Constraint} and can now be bound to any expression of type \Type{PlanExpression} within the Do Expression. In the example, the operator \Code{with} is utilized to bind \Code{timeLimit} to the plan instance \Code{b}. \RefTable{constraintconstructors} extends the type system of the MSL and defines the different values of type \Type{Constraint} as well as defines the \Code{with} operator.
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.0cm}|p{3.0cm}|p{8cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{TimeConstraint} & \Type{Constraint} & \Code{TimeConstraint \BrackType{\Metatype{string}}(\BrackType{Time} $<=$ StartTime $<=$ \BrackType{Time}, \BrackType{Time} $<=$ EndTime $<=$ \BrackType{Time})}\\
+\hline \Code{PowerConstraint} & \Type{Constraint} & \Code{PowerConstraint \BrackType{\Metatype{string}}(\Type{String}})\\
+\hline \Code{operator with} & \Type{PlanExpression} & \Code{\BrackType{PlanExpression} with \BrackType{Constraint Identifier}}\\
+\hline
+\end{tabular} 
+\caption{Constraint Type Values} \label{tbl:constraintconstructors}
+\end{table}
+}
+
+The syntax of a user-defined plan declaration can be enhanced thus:
+
+\begin{verbatim}
+Plan <plan identifier>
+(
+    <plan instance declaration 1>
+    <plan instance declaration 2>
+    ...
+    <plan instance declaration n>
+    
+    <constraint declaration 1>
+    <constraint declaration 2>
+    ...
+    <constraint declaration n>    
+    
+    Do(<plan expression>)
+)
+\end{verbatim}
+
+\subsubsection{Meaning of a Constraint}
+When a plan expression is bound to a constraint via the \Code{with} operator, it means that the MPFL runtime must plan to carry out the task represented by that plan instance under the limitations of that constraint. The constraint in Example 8 is a \Definition{time constraint}. The time constraint in Example 8 tells us that plan instance \Code{b} must start sometime between 7 PM and 8 PM of the current day and complete between 7 PM to 9:30 PM of the following day.
+
+The other type of \Type{Constraint} in the language is a \Definition{power constraint} which enforces the amount of energy that can be used by a plan instance to accomplish it's task, along with the maximum energy usage rate (i.e. power) .
+
+\subsubsection{Binding to an Entire Subexpression}
+The \Code{with} operator, as described in \RefTable{constraintconstructors}, allows binding a constraint to any subexpression of type \Type{PlanExpression}. Like all other operators in the language, it is left-associative. For example, the Do Expression from Example 8 can be modified to bind the constraint to both \Code{a} and {b} in the expression:
+
+\begin{center}
+\Code{Do(((a \& b) with timeLimit)) $>$ c)}
+\end{center}
+
+Equivalently one can just use the \Code{with} operator twice and achieve the same result:
+
+\begin{center}
+\Code{Do((a with timeLimit) \& (b with timeLimit) $>$ c)}
+\end{center}
+
+\subsubsection{Binding Multiple Constraints and Constraint Intersection}
+One can bind as many constraints to a \Type{PlanExpression} as they would like. With multiple constraints, MPFL takes the \emph{intersection} of all constraints. A modified version of Example 8 that has more than one \Code{TimeConstraint} is as follows:
+
+\begin{verbatim}
+Plan anExample
+(
+    UseSonar a(...)
+    Search b(...)
+    Loiter c(...)
+
+	TimeConstraint timeLimit1(ClockTime(Days=0, Time=19::00::00) <= StartTime <= 
+	                          ClockTime(Days=0, Time=20::00::00), 
+	                          ClockTime(Days=1, Time=19::00::00) <= EndTime <= 
+	                          ClockTime(Days=1, Time=21::30::00))
+
+	TimeConstraint timeLimit2(ClockTime(Days=0, Time=15::00::00) <= StartTime <= 
+	                          ClockTime(Days=0, Time=19::30::00), 
+	                          ClockTime(Days=1, Time=19::30::00) <= EndTime <= 
+	                          ClockTime(Days=1, Time=22::00::00))
+    
+    Do(((a & b) with timeLimit1) > c) with timeLimit2)
+)
+\end{verbatim}
+\CodeCaption{9}{Binding multiple constraints}\\
+
+In this case, \Code{a} and \Code{b} have both \Code{timeLimit1} and \Code{timeLimit2} bound to them. Plan instance \Code{c} has only \Code{timeLimit2} bound to it. The intersection of \Code{timeLimit1} and \Code{timeLimit2} ends up in a new time constraint with a start time between 7 pm and 9:30 pm and an end time between 7:30 pm and 9:30 pm the following day. In the case the intersection of time constraints is empty, it means the constraints do not overlap and the task to which the constraint is bound will be infeasible (this is discussed in later sections). For the case of power constraints, the intersection is simply the minimum values for the maximum energy allowed and maximum power level.
+
+\subsubsection{Constraints are Hierarchical}
+When constraints are bound to instances of user-defined plans (i.e. instances that are \Code{ExecutePlan} values), those constraints are implicitly bound to all its descendants in the plan instance tree. This is one of the interesting features of the MSL; allowing constraints to be hierarchically arranged. This is a natural way to reason about resource allocation during planning; allocate large chunks of resources for the high-level goals which are then broken into smaller chunks to be distributed to subgoals. It is likely when creating the mission specification that higher-level (i.e. coarse) level plan instances that are closer to the \emph{sortie} plan instance will have the larger portion of resources than those divvied up amongst the children plan instances. The children in turn can create tighter constraints for their children and so on. 
+
+\subsection{Handling Errors: Infeasibilities and Conflicts}
+One issue that arises is what MPFL does when it cannot achieve a goal or set of goals defined within an MSL program. In the MPFL world, there are two types of problems that can occur during planning respectively known as \Definition{infeasibility errors} and \Definition{conflict errors}.
+
+\subsubsection{Infeasibility Errors}
+Infeasibility errors occur when a task the user requested is physically impossible for the AUV to achieve. For example, if one was to create a \Code{UseAutopilot} plan instance requesting the vehicle move from the Chesapeake Bay to Hawaii with a time constraint of an hour, it would be an impossible task. This task could be impossible for several reasons. Obviously time is one of the issues. Another reason it could be infeasible is that the vehicle does not have enough power to accomplish the mission.
+
+\subsubsection{Conflict Errors}
+Conflict errors, in contrast to infeasibility errors, come into play when the AUV cannot do two or more requested tasks at the same time due to a resource scheduling conflict between them. For example, the vehicle could have onboard both a sonar and an acoustic modem, both require using a shared communication medium (the water). If each device utilizes the same frequency band, it may not be possible to use them both at the same time, causing a conflict error. At this point, a choice would have to be made on which device gets to be used and when.
+
+\subsubsection{Graceful Degradation and Exception Handling}
+When humans encounter problems achieving our own infeasibilities and conflicts, we make decisions to keep progressing even if it is in a suboptimal manner. This may mean giving up on some of our goals for the time being so we can achieve others. Sometimes not achieving one or more goals in your set of goals can be a show stopper, causing one to throw away the remainder of the goals. Essentially, humans continue to persevere even though they fail in life. With robotics, it is no different. One of the problems with design of autonomous robots, or any complex system for that matter, is dealing with failures of subcomponents. Well-designed systems can keep functioning, albeit in a potentially degraded mode, in the event of failures. This is known as \Definition{graceful degradation}. For example, just because a sensor fails does not mean a robot cannot still continue its mission utilizing the remainder of its sensors and accounting for the amount of error introduced by losing said sensor.
+
+In the MSL we can support graceful degradation by replicating the decision making capability humans use when having to dealing with their own infeasibilities and conflicts. In many modern programming languages, the language provides the ability to handle errors via \Definition{exception handling}. Exception handling allows programmers at any point to signal an exceptional situation (known as \emph{raising} or \emph{throwing} an exception). Programmers can catch errors by associating an \Definition{exception handler} to a block of code that may raise an exception somewhere within its thread of execution. If an exception is raised, the call stack is unwound until an exception handler in scope that can handle the exception is found. Once the exception is handled, code execution returns to the first line of code after the handler. Exceptions are useful because:
+\begin{itemize}
+\item They are typically typed values in the language that can store information about the exceptional situation
+\item They can be handled in a hierarchical fashion at any level along the call stack. Sometimes it makes more sense to handle the error nearer to the point where the exception was raised and sometimes it makes more sense to deal with at a higher level.
+\item They separate error handling code from the application logic of the program. Not only does this make the code cleaner, but it is easy to add in new exceptions and exception handlers as the code evolves without having to modify the application logic.
+\end{itemize}
+
+\subsubsection{Infeasible and Conflict Handlers}
+In the MSL, a form of exception handling is used to deal with infeasibilities and conflicts. For each user-defined plan, one has the ability to specify up to two handlers, one being an \Definition{infeasibility handler} and the other being a \Definition{conflict handler}. When infeasibilities and conflicts occur within/between plan instances, the MPFL runtime jumps to the nearest handler and attempts to resolve the issue.
+
+To illustrate the use of infeasibility and conflict handling in the MSL, observe the following example:
+
+\begin{verbatim}
+Plan meow
+(
+   Search a(...)
+   Transit b(...)
+   UseSonar c(...)
+   PhoneHome d(...)
+   UseModem e(...)
+
+   Do(b > (a & c) || (d ^ e))
+
+   OnInfeasible   
+   (
+      Case(a) (Disable(a))
+      Case(b) (Disable(b))
+      Case(c) 
+      (
+         if (LookupBoolean(GiveUpOnC)) then
+            Retract(c)
+         else
+            Disable(c)
+         endif
+      )
+      Case(d) (Retract(d))
+      Case(e) (Disable(e))      
+   )
+   
+   OnConflict
+   (
+      Case(a,c)(Disable(c))
+      Case(a,b,c,d,e) (Disable(a,d))
+      Case(b,d,e)(Retract(e))
+   )
+)
+\end{verbatim}
+\CodeCaption{10}{A user-defined plan specifying both an infeasibility handler and conflict handler\\}
+
+Example 10 illustrates the use of both an infeasibility handler and a conflict handler. When MPFL cannot generate schedules that would lead to the completion of some task due to a problem, the runtime generates either an infeasibility or conflict exception depending on the type of problem that occurred. This event triggers MPFL to resolve the infeasibility or conflict via the nearest exception handler. Infeasibility exceptions are handled by the \Code{OnInfeasible} handler and conflict exceptions are handled by the \Code{OnConflict} handler. Each handler consists of a set of \Definition{case} expressions. Each expression has two parts: a \Definition{signature} indicating which plan instance(s) caused the problem (enclosed in parentheses after the keyword \Code{Case}) and then a \Definition{handler expression} which resolves the problem. 
+
+The signature indicates which plan instances caused the problem. In the case of the infeasibility handler, each case signature can only have a single entry as each infeasibility maps to a single plan instance. In contrast conflicts have a list of plan instances in their signature indicating which tasks have a conflict between them. Within the handler expression, the user must decide to either \Definition{disable} or \Definition{retract} one of the plan instances referenced in the case signature. Disabling means to \textit{temporarily disable} the task for the current MPFL compilation cycle whereas retract means \textit{permanently remove} the task from consideration. The MPFL compiler forces the user to disable or retract at least one plan instance referenced in the signature (in the case of infeasibilities, there is only one option) using the \Code{Disable} and \Code{Retract} functions respectively. Users can also use conditional expressions to make their decision just like in the Do Expression. \RefTable{handlers} describes all the different valid handler expressions that can be used in an infeasibility or conflict handler.
+
+{ %Note: These braces needed to prevent renew command taking over, ugly hack to increase row height
+\renewcommand{\arraystretch}{1.2}
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{3.3cm}|p{3.2cm}|p{7.5cm}|}
+\hline \textbf{Value} & \textbf{Type} & \textbf{Syntax} \\
+\hline \Code{If Then Else Endif} & \Type{HandlerExpression} & \Code{if \BrackType{Boolean} then \BrackType{HandlerExpression} else \BrackType{HandlerExpression}}\\
+\hline \Code{Disable} & \Type{HandlerExpression} & \Code{Disable(\BrackType{HandlerExpression})}\\
+\hline \Code{Retract} & \Type{HandlerExpression} & \Code{Retract(\BrackType{HandlerExpression})}\\
+\hline plan instance chain & \Type{HandlerExpression} & \Code{\BrackType{\Metatype{String}}->...->\BrackType{\Metatype{String}}}\\
+\hline
+\end{tabular} 
+\caption{MSL handler expression types} \label{tbl:handlers}
+\end{table}
+}
+
+We can now finalize the syntax of a user-defined plan declaration:
+
+\begin{verbatim}
+Plan <plan identifier>
+(
+    <plan instance declaration 1>
+    <plan instance declaration 2>
+    ...
+    <plan instance declaration n>
+    
+    <constraint declaration 1>
+    <constraint declaration 2>
+    ...
+    <constraint declaration n>    
+    
+    Do(<plan expression>)
+    
+    <infeasible handler>
+    <conflict handler>
+)
+\end{verbatim}
+
+\subsubsection{Handlers Are Hierarchical}
+Just like exceptions in most languages, when an exception is raised/thrown, the execution path jumps to the
+nearest handler that can handle that particular type of exception. If the nearest exception handler cannot handle
+the case, it jumps up to the next one in the plan that contains the conflicting/infeasible instance(s) parent
+instance declaration. Eventually, if no handlers are found in the sortie plan, the exception has not been handled by the user and results in an unhandled exception error. This causes the MPFL runtime to exit with an error. It is the responsibility of the user to handle all infeasibility and conflict cases. The MPFL compiler will warn the user when cases are unhandled during compile time. The following example illustrates the hierarchical nature of MSL handlers:
+
+\begin{verbatim}
+Plan makeNoise
+(
+   UseModem a(...)
+   UseSonar b(...)
+   
+   Do(a & b)
+   
+   OnInfeasible
+   (
+      Case(a)(Retract(a))
+   )
+)
+
+Plan distractTarget
+(
+   Transit x(...)
+   ExecutePlan y(UserPlanName = makeNoise)
+   
+   Do(x > y)
+
+   OnInfeasible
+   (
+      Case(x)(Disable(x))
+      Case(y)(Disable(y))		
+ 	)      
+)
+\end{verbatim}
+\CodeCaption{11}{Hierarchical exception handling}\\
+
+In Example 11, the user-defined plan \Code{makeNoise}, plan instance \Code{b} has no infeasible handler. However, as \Code{b} is a child of the instance \Code{y} declared within \Code{distractTarget}, when the case is unmatched in \Code{makeNoise}, it will jump to the handler in \Code{distractTarget} for \Code{y}. When \Code{y} is disabled, the child plan instance \Code{b} (and children it may have) will be disabled. The ability to handle errors at any level allows MSL programmers to handle errors within the scope that is most appropriate.
+
+\subsubsection{Case Signature Matching and Plan Instance Chains}
+To take hierarchical exception handling further, MSL handler case signatures do not necessarily have to reference plan instances within the same user-defined plan as the infeasibility or conflict handler(s), but also any of those plan instances' descendants (i.e. children, grandchildren, and so forth). 
+
+In each case expression, the case signature is actually not matching on the name of a plan instance, but rather it is matching against its \Definition{plan instance chain}. Every plan instance in the MPFL runtime can be uniquely identified as a sequence of plan instance identifiers starting from the root instance in the plan instance tree, the \emph{sortie} instance. The notation for this involves sequentially naming the plan instances forming the chain with arrows (-$>$) delimiting the instances. Take for example the following code:
+
+\begin{verbatim}
+Plan pasta
+(
+   PhoneHome pasta1(...)
+   Transit   pasta2(...)
+   
+   Do(...)
+)
+
+Plan bread
+(
+   ExecutePlan bread1(UserPlanName = pasta)
+   ExecutePlan bread2(UserPlanName = pasta)
+   Search      bread3(...)
+
+   Do(...)
+)
+
+Plan rice
+(
+   UseAutopilot rice1(...)
+   Loiter       rice2(...)
+   ExecutePlan  rice3(UserPlanName = pasta)   
+   ExecutePlan  rice4(UserPlanName = bread)      
+   
+   Do(...)
+)
+\end{verbatim}
+\CodeCaption{12}{Understanding plan instance chains}\\
+
+Example 12 shows multiple instances of the same user-defined plan. By having multiple instances of the user-defined plans \Code{pasta} and \Code{bread}, there are multiple instances of the plan instances declared within them. However, each plan instance can be uniquely identified using its plan instance chain. For example, there are multiple instances of the plan instance \Code{pasta1} declared within the plan \Code{pasta}:
+
+\begin{verbatim}
+sortie->rice3->pasta1
+sortie->rice4->bread1->pasta1
+sortie->rice4->bread2->pasta1
+\end{verbatim} 
+
+The plan instance chain is analogous to the \emph{process identifier} in operating systems such as Unix where each process has a unique integer identifier. Even though there may be multiple processes of the same program, each one is unique with its own identifier.
+
+What makes plan instance chains useful in the MSL is that they can be used in the case signatures of handlers. This allows for fine grained error handling control by allowing users to write handlers for problems caused by descendants of plan instances declared within their user-defined plans. The intuitive reason for this feature is that it sometimes may make sense to handle an error for a child at a higher level as there is more contextual information there. To illustrate, Example 13 modifies Example 12 to utilize the plan instance chain notation:
+
+\begin{verbatim}
+Plan makeNoise
+(
+   UseModem a(...)
+   UseSonar b(...)   
+   
+   Do(a & b)
+   
+   OnInfeasible
+   (
+      Case(a)(Retract(a))
+   )
+)
+
+Plan distractTarget
+(
+   Transit x(...)
+   ExecutePlan y(UserPlanName = makeNoise)
+   
+   Do(x > y)
+
+   OnInfeasible
+   (
+      Case(x)(Disable(x))
+      Case(y->b)(Disable(y->b)
+      Case(y)(Disable(y))		
+   )
+   OnConflict
+   (
+      Case(y->a, y->b) 
+      (
+         if (LookupFloat(energyLeftHours) > 500) then 
+         (
+            Disable(y->b)
+         )
+         else
+         (
+            Disable(y->a)
+         )
+      Case(x,y)(Disable(y))
+   )   
+)
+\end{verbatim}
+\CodeCaption{13}{Plan instance chain used in handlers}\\
+
+In Example 13, the infeasibility and conflict handlers utilize plan instance chains to directly reference child instances \Code{y$\rightarrow$a} and \Code{y$\rightarrow$b}. In the infeasibility case, if \Code{b} gives problems, it will end up triggering the infeasibility handler in \Code{distractTarget} with signature \Code{y$\rightarrow$b} causing it to be disabled. The last case in the same block (\Code{Case(y)(Disable(y))}, is actually unreachable. If \Code{y$\rightarrow$a} had an infeasibility, it would be handled directly in \Code{makeNoise}, and the latter case with \Code{y$\rightarrow$b} is handled in the previous case. This brings up an interesting point about how case signature pattern matching works. If in Example 12 the order of the infeasible cases matters; if \Code{Case(y$\rightarrow$b)} came after \Code{Case(y)} in \Code{distractTarget}'s infeasibility handler, it would actually fire first. This is because \Code{y} and \Code{y$\rightarrow$b} are both valid matches for the case as they are in the same lineage. Matching is therefore based on the first-matching signature rather than the one that matches most closely in the structural sense.
+
+Example 13 also demonstrates how conflicts can be handled in the same way by adding a conflict handler to \Code{distractTarget}. In this handler, if \Code{y$\rightarrow$a} and \Code{y$\rightarrow$b} were to conflict, it will be handled there. However, with conflicts, the chains cannot be any arbitrary tuple of plan instance chains; chains must be exactly the same except for the last hop. The reason for this is because of a physical limitation of the MPFL compiler and the difficulty in having the ability to compare arbitrary plan instances for conflict.
+
+\section{Segue: Making it Work}
+This concludes the chapter on the MPFL Mission Specification Language. Hopefully, it is evident how using a domain-specific programming language can be a powerful means of control of an AUV. The language allows one to focus on the task at hand: planning missions for AUVs. The syntax is simple, consistent, and can only be used to express planning problems. The declarative nature of the language allows AUV operators to specify \emph{what} they want to do and not \emph{how} they want to do it. The language brings with it strong static typing to prevent errors, a type system with dimensions checking to prevent unit errors, the ability to handle system failures in a graceful and hierarchical way through exceptions, and a uniform and intuitive way of reasoning about the problem. 
+
+Those that work in robotics may think such a language is a great idea, but may seem difficult or even infeasible to build. However, it is possible and a straightforward approach is described in the next chapter. By using a simple \textit{model of planning}, one can implement an MPFL compiler that obeys the semantics informally described in this last chapter. The next chapter will describe an implementation of MPFL and how it relates to concepts in Chapter 2. Understanding the MSL is important to understanding how MPFL works and why the language was described first. The next chapter demonstrates that the MSL is not only the external interface to a robot that uses MPFL, but also the foundation of the MPFL compiler/runtime's internal implementation.
+
+MPFL is not a standalone compiler; it depends on plugins that define some of the primitive capabilities of the robot. These plugins are defined through an simple API which is tied closely to the implementation of the core MPFL compiler/runtime. The next chapter will describe the API and describe how autonomy software developers can harness MPFL in their autonomous robots.
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "mythesis"
+%%% End: 

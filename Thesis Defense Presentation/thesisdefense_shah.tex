@@ -1,0 +1,354 @@
+ \documentclass{beamer}
+
+
+
+\setbeamercolor{alerted text}{fg=white}
+\setbeamercolor{background canvas}{bg=black}
+\setbeamercolor{block body alerted}{bg=normal text.bg!90!black}
+\setbeamercolor{block body}{bg=normal text.bg!90!black}
+\setbeamercolor{block body example}{bg=normal text.bg!90!black}
+\setbeamercolor{block title alerted}{use={normal text,alerted text},fg=alerted text.fg!75!normal text.fg,bg=normal text.bg!75!black}
+\setbeamercolor{block title}{bg=blue}
+\setbeamercolor{block title example}{use={normal text,example text},fg=example text.fg!75!normal text.fg,bg=normal text.bg!75!black}
+\setbeamercolor{fine separation line}{}
+\setbeamercolor{frametitle}{fg=white}
+\setbeamercolor{item projected}{fg=black}
+\setbeamercolor{normal text}{bg=black,fg=white}
+\setbeamercolor{palette sidebar primary}{use=normal text,fg=normal text.fg}
+\setbeamercolor{palette sidebar quaternary}{use=structure,fg=structure.fg}
+\setbeamercolor{palette sidebar secondary}{use=structure,fg=structure.fg}
+\setbeamercolor{palette sidebar tertiary}{use=normal text,fg=normal text.fg}
+\setbeamercolor{section in sidebar}{fg=brown}
+\setbeamercolor{section in sidebar shaded}{fg= grey}
+\setbeamercolor{separation line}{}
+\setbeamercolor{sidebar}{bg=red}
+\setbeamercolor{sidebar}{parent=palette primary}
+\setbeamercolor{structure}{bg=black, fg=red}
+\setbeamercolor{subsection in sidebar}{fg=brown}
+\setbeamercolor{subsection in sidebar shaded}{fg= grey}
+\definecolor{darkgrey}{RGB}{103,103,103}
+\setbeamercolor{title}{fg=darkgrey}
+\setbeamercolor{titlelike}{fg=white}
+\setbeamercolor{itemize item}{fg=darkgrey} % all frames will have red bullets
+\setbeamertemplate{navigation symbols}{}%remove navigation symbols
+
+\mode<presentation>
+{
+  \usetheme{default}
+  
+  % or ...
+
+  \setbeamercovered{transparent}
+  % or whatever (possibly just delete it)
+}
+
+
+\usepackage[english]{babel}
+% or whatever
+
+\usepackage[latin1]{inputenc}
+% or whatever
+
+\usepackage{times}
+\usepackage[T1]{fontenc}
+% Or whatever. Note that the encoding and the font should match. If T1
+% does not look nice, try deleting the line with the fontenc.
+
+\usepackage{graphicx}
+\input{definitions_shah.tex}
+
+\title[MPFL] % (optional, use only with long paper titles)
+{A Language-Based Software Framework \\for Mission Planning\\in Autonomous Mobile Robots}
+
+
+\author[Mirza A. Shah] % (optional, use only with lots of authors)
+{Mirza A. Shah}
+% - Give the names in the same order as the appear in the paper.
+% - Use the \inst{?} command only if the authors have different
+%   affiliation.
+
+\institute[Penn State CSE] % (optional, but mostly needed)
+{\textbf{Department of Computer Science \& Engineering}\\\textbf{Penn State University}
+\\M.S. Thesis Defense\\Advisor: Dr. John Hannan}
+
+% - Use the \inst command only if there are several affiliations.
+% - Keep it simple, no one is interested in your street address.
+
+\date[] % (optional, should be abbreviation of conference name)
+{July 1, 2011}
+% - Either use conference name or its abbreviation.
+% - Not really informative to the audience, more for people (including
+%   yourself) who are reading the slides online
+
+\subject{Autonomous Robots}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+%\pgfdeclareimage[height=0.25cm]{university-logo}{arl.png}
+%\logo{\pgfuseimage{university-logo}}
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%Areas of Interest
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item Autonomous Robots
+	\item Artificial Intelligence
+	\item Programming Languages
+	\item Operations Research
+	\item Software Engineering
+	\end{itemize}
+\end{frame}
+
+%Pictures of Robots
+%**************************************************************************
+\begin{frame}
+\InsertPicture{robotsgalore1.png}{0.4}
+\end{frame}
+
+%More robots
+%**************************************************************************
+\begin{frame}
+\InsertPicture{robotsgalore2.png}{0.4}
+\end{frame}
+
+%How Autonomous Robots Work
+%**************************************************************************
+\begin{frame}
+	\InsertPicture{sense-model-plan-act.png}{0.35}
+\end{frame}
+
+%iRobot Create Schematic
+%**************************************************************************
+\begin{frame}
+	\InsertPicture{creatediagram.png}{0.15}
+\end{frame}
+
+%Components of Intelligence
+%**************************************************************************
+\begin{frame}
+	\InsertPicture{components_of_intelligence.png}{0.32}
+\end{frame}
+
+%Unified Picture of Intelligence - Combining Sense - Model - Plan - Act
+%**************************************************************************
+\begin{frame}
+\InsertPicture{howrobotworks.png}{0.28}
+\end{frame}
+
+%A Problem of Software Engineering
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item Autonomy is realized in form of software running on robot
+	\item More autonomy means robot must be more intelligent
+	\item More intelligent means higher robot software complexity
+	\item Many tools created to help manage complexity
+		\begin{itemize}
+		\item Software libraries
+		\item Software frameworks
+		\item Programming languages
+		\item Robot operating systems
+		\end{itemize}
+	\item Still too much software redundancy
+	\end{itemize}
+\end{frame} 
+
+%Focus on Planning
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item Focus on planning
+	\item \Def{Planning} is the act of creating a schedule
+	\item A \Def{schedule} is a set of timestamped actions that need to be taken to achieve a set of goals
+	\end{itemize}
+\end{frame}
+
+%Schedule Example
+%**************************************************************************
+\begin{frame}
+\InsertPicture{schedule.png}{0.4}
+\end{frame}
+
+%Reactive vs Deliberative Planning
+%**************************************************************************
+\begin{frame}
+\InsertPicture{reactivevsdeliberative.png}{0.4}
+\end{frame}
+
+%Current Approaches
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item \textbf{General-purpose Planners} 
+		\begin{itemize}
+		\item Take as input goals, constraints, initial state, action/next state pairs
+		\item Searches for action sequence to achieve goals
+		\item Problem: Search space explosion
+		\end{itemize}
+	\item \textbf{Domain-specific Planning/Scheduling Algorithms}
+		\begin{itemize}
+		\item Disparate algorithms for solving specific problems
+		\item Often combined together in form of multi-agent systems, resulting in distributed planning system
+		\item Studied greatly in fields of operations research, industrial engineering, and logistics
+		\item Problem: No unified concept
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+% END BACKGROUND
+%**************************************************************************
+%**************************************************************************
+%**************************************************************************
+
+\begin{frame}
+	\begin{itemize}
+	\item \textbf{My research} - Creating a unified architecture for disparate, domain-specific planning algorithms
+	\item \textbf{Why?} - To advance the state of autonomy software
+	\begin{itemize}
+	\item Increase reusability, modularity, portability
+	\item Verification and guarantees of operational correctness, reducing bugs
+	\item Build software quicker, cheaper
+	\item Make robotics more accessible to outside fields
+	\end{itemize}
+	\end{itemize}
+\end{frame}
+
+%Languages
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item \textbf{Language} is the foundation of human thought.
+	\item Different concepts are easier to reason about in different languages
+	\item This is true of programming languages as well...
+	\end{itemize}
+\end{frame}
+
+%Solving Problems With Languages
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item \textbf{Think of planning as a language.}
+	\item What kind of language would be ideal for describing to a robot what you want it to do?
+	\item How do we implement a compiler/interpreter for such a language?
+\end{itemize}
+\end{frame}
+
+%My Approach - MPFL Intro
+%**************************************************************************
+\begin{frame}
+
+	\begin{itemize}
+	\item \Def{Modular Planning Language \& Framework (MPFL)}
+		\begin{itemize}
+		\item A \textbf{software framework} for building planning autonomy on a robot.
+		\item Robots using MPFL can be controlled by a domain-specific programming language for robotic planning, the \Def{Mission Specification Language (MSL)}.
+		\item Users link a client application against MPFL library. Compiler is invoked via API call from client.
+		\end{itemize}
+	\end{itemize}
+	\InsertPicture{mpflhighlevel.png}{0.45}
+\end{frame}
+
+%Demo Here!!!
+%**************************************************************************
+\begin{frame}
+\InsertPicture{MPFL_Demo_Block_Diagram.png}{0.4}
+\end{frame}
+
+%How MPFL Client interacts with library
+%**************************************************************************
+\begin{frame}
+\InsertPicture{MPFL_client_layers.png}{0.32}
+\end{frame}
+
+%Internals of MPFL Demo Client
+%**************************************************************************
+\begin{frame}
+\InsertPicture{MPFL_Demo_Client_Internals.png}{0.26}
+\end{frame}
+
+%How MPFL Works
+%**************************************************************************
+\begin{frame}
+\InsertPicture{mpfl_engine_full.png}{0.30}
+\end{frame}
+
+%Example Planner Hierarchy
+%**************************************************************************
+\begin{frame}
+\InsertPicture{exampleplannerhierarchy.png}{0.30}
+\end{frame}
+
+%Bonus - Plan Instance Context
+%**************************************************************************
+\begin{frame}
+\InsertPicture{planinstanceiscontext.png}{0.26}
+\end{frame}
+
+%Bonus - LST State
+%**************************************************************************
+\begin{frame}
+\InsertPicture{ltstate.png}{0.23}
+\end{frame}
+
+%Bonus - PI Tree on Initalization
+%**************************************************************************
+\begin{frame}
+\InsertPicture{ltdemooninit.png}{0.36}
+\end{frame}
+
+%Bonus - PI Tree after LST Eval
+%**************************************************************************
+\begin{frame}
+\InsertPicture{ltdemoafterlst.png}{0.36}
+\end{frame}
+
+
+
+
+%Conclusion
+%**************************************************************************
+\begin{frame}
+	\begin{itemize}
+	\item Verification and Correctness
+		\begin{itemize}
+		\item Static typing and dimensional analysis
+		\item Guarantees of operational correctness
+		\item Design-by-contract and inability of user to corrupt runtime
+		\end{itemize}
+	\item Reusability and Modularity
+		\begin{itemize}
+		\item Build planning autonomy piecemeal in form of plugins
+		\item Plugins are reusable across different robots using MPFL
+		\end{itemize}	
+	\item Simplicity
+		\begin{itemize}
+		\item Very simple engine, low computational overhead
+		\item Easy to learn API and language
+		\end{itemize}
+	\item Power
+		\begin{itemize}
+		\item Highly declarative control language (MSL)
+		\item Graceful degradation through exception handling
+		\item Maps complex deliberative planning problem into a set of independent scheduling problems
+		\end{itemize}	
+	\end{itemize}
+\end{frame}
+
+
+\end{document}

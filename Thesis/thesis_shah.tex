@@ -1,0 +1,326 @@
+%% thesis_shah.tex
+%% Master's Thesis Tex File
+%% Mirza A. Shah
+
+\documentclass[11pt]{psuthesis}
+
+%% optional packages, in case you want AMS math macros and AMS symbols
+\usepackage{amsmath,amssymb}
+%% allows bibtex, \citet{}, \citep{} referencing:
+\usepackage{natbib}
+%% needed for my semantic and type inference rules
+\usepackage{proof}
+%% I truthfully don't know what the following is for, but I never used it:
+%\citestyle{aa}
+%% optional package, in case you want PostScript graphics:
+\usepackage{graphicx}
+%% the following allows you to use the AAS deluxetable environment:
+\usepackage{deluxetable}
+%% Use the following if you have tables that are longer than a single page::
+%\usepackage{longtable}
+%% Use the following if you have (non-deluxetables, i.e., longtables) that
+%% you need to display landscape oriented:
+%\usepackage{lscape}
+\usepackage{listings}
+
+%% for a less-than-final version of the thesis, this command
+%% places "DRAFT: <date> AT <time>" at the top of each page...
+%\thesisdraft    
+
+%% you can speed things up by compiling only one chapter at a time
+%\includeonly{somechapter}
+%\includeonly{someotherchapter}
+%\includeonly{yetanotherchapter}
+%\includeonly{Ithinkyougettheideachapter}
+%\includeonly{conclusions}
+%% (comment this out for the final version)
+
+%% Fix the text citations so that there is no comma between the authors and 
+%% year.  This will help contain the furious Brandt red pen.
+\bibpunct{(}{)}{;}{a}{}{,}
+
+%% Change the fonts back to something reasonable.
+%% Note: scriptsize is typically smaller than footnotesize.
+%\renewcommand{\scriptsize{\@setfontsize\scriptsize\@ixpt{9pt}}
+%\renewcommand{\footnotesize{\@setfontsize\scriptsize\@xpt{10pt}}
+
+%%
+%% These are all the definitions that I've used throughout my thesis.
+\input{definitions_shah.tex}
+
+\begin{document}
+
+%%Comment this out for the final thesis:
+
+%%
+
+%% at the beginning of the thesis we have a title page, a signature
+%% page, and an abstract
+
+\author{Mirza A. Shah}
+
+
+\title{\uppercase {A Language-Based Software Framework for Mission Planning in Autonomous Mobile Robots}}
+
+\dept{Computer Science and Engineering}
+
+\submitdate{July 2011}
+
+\copyrightyear{2011}
+
+
+\begin{singlespace}
+
+\readerone{John Hannan \\
+         \assocprof{Computer Science and Engineering} \\
+         \adviser}
+
+\readertwo{Mahmut Kandemir\\
+           \prof{Computer Science and Engineering}}
+
+%%   Key to titles:
+%% Associate Professor: \asocprof{of what}
+%% Assistant Professor: \assistprof{of what}
+%% Full Professor: \prof{of what}
+%% also Dept. Head: \head{of what}
+%% You can also do things like: ``Associate \head{of what}''
+
+\begin{frontmatter}
+
+%this is the ``normal'' signature page from the original version of the class
+%\signaturepage
+
+\begin{doublespace}
+\titlepage
+\end{doublespace}
+
+%this is the new committee page
+\committeepage
+
+\include{./Chapters/abstract}
+
+%% this is the end of the abstract
+
+%% after the abstract come the table of contents, the list of tables,
+%% and the list of figures
+%% Note about the figure list... so the figure list is a decent length,
+%% use the following command for the figure captions:
+%% \caption[Short figure title to appear in figure list]{Normal figure caption}
+%% (this trick unfortunately does not work with the deluxetable 
+%% ``\tablecaption'' command, so be careful what you put in the table captions)
+%%
+%% If you have really long tables that cover multiple pages, you
+%% will want to use the ``longtable'' environment (it is very similer to
+%% deluxetable) but allows you to specify headers and footers for the first,
+%% last, and middle pages of the figure.
+
+%% use this command to omit the list of tables,
+%% if the thesis doesn't contain any tables
+%\nolotables
+
+%% use this command to omit the list of figures,
+%% if the thesis doesn't contain any figures
+%\nolofigures
+
+\tables
+
+%% next come the acknowlegements (optional) and the preface (optional)
+
+\include{./Chapters/acknowledgments}
+
+%\preface    % optional
+
+\clearpage
+
+\vspace*{2.0truein}
+
+\LARGE
+\parbox{4.0truein}{
+\par\noindent
+\textit{For my favorite scientist: my father.}
+}
+
+\normalsize
+
+\end{frontmatter}
+
+%% this is the end of the front matter
+
+%% now we include the actual chapters of the thesis
+%% there are individual chapter files ch-intr.tex, ch-over.tex, ...
+%% (NOTE: you do not need the ``.tex'' extention on the file name 
+%% in the include statement)
+%% these chapters can be in a sub-directory, for example: 
+%% \include{chapterdirectory/chaptername}
+
+\include{./Chapters/chapter1}
+
+\include{./Chapters/chapter2}
+
+\include{./Chapters/chapter3}
+
+\include{./Chapters/chapter4}
+
+\include{./Chapters/chapter5}
+
+\include{./Chapters/chapter6}
+
+\include{./Chapters/chapter7}
+
+%\include{./Chapters/chapter8}
+
+
+%\include{conclusions}
+
+%% now we include the appendices
+%\appendices
+%% omit this if there are no appendices
+
+%% if there is only one appendix, 
+%% say \singleappendix instead of \appendices
+% \singleappendix
+
+%% these are the actual commands to include the apendix files:
+
+%\include{ap-addi}
+
+%\include{ap-more}
+
+
+%% finally comes the bibliography and vita
+%% the bibliography is generated automatically using BibTeX
+%% Note: in order to get the (author year) citation style, this example 
+%% includes a different *.bst style file than psuthesis.bst.  Sarah found 
+%% this style file on: http://www.ee.oulu.fi/~harza/latex/  
+%% This style includes the paper titles in the bibliography, so use it 
+%% if you want:
+%\bibliographystyle{/enter/path/to/ayphdthesis_mod}
+%% However, according to the grad school thesis guide (c.2004), there is no 
+%% special formating required for the bibliography, and to just follow 
+%% the citation styles of your field, in that case the ``apj'' style is 
+%% prefectly OK, so that is the one that is going to be included in this
+%% example file (use whichever style you prefer):
+\bibliographystyle{plainnat}
+
+%% the following is the path to you *.bib file 
+%% (you do not need to enter the ``.bib'' extention)
+\bibliography{thesis_shah}
+%% ADS can generate the entries in the bib file for you, just call up
+%% the abstract, then near the bottom of the abstract page there is a
+%% link to ``Bibtex entry for this abstract'' - just copy that into 
+%% your bib file.  Here is an example bibtex entry:
+%% @ARTICLE{citecode,
+%%    author = {{Smith}, J. and {Jones}, M.},
+%%     title = "{This Paper has some Really Cool Results}",
+%%   journal = {\aj},
+%%      year = 2002,
+%%     month = sep,
+%%    volume = 123,
+%%     pages = {1-20},
+%%    adsurl = {http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2002AJ....123.1S&amp;db_key=AST},
+%%   adsnote = {Provided by the NASA Astrophysics Data System}
+%% }
+%% NOTE: ADS returns the AASTeX code for the journal name, you'll either 
+%% have to change that by hand in each bib entry, or include a 
+%% definition of the codes in your ``definitions'' file so LaTeX doesn't 
+%% freak out.  Also, what I entered as ``citecode'' can be changed to 
+%% whatever you want to use in the citations in the document, i.e., for
+%% ``\citet{citecode}'' or ``\citep{citecode}''.
+
+
+%% the thesis must end with a Curriculum Vitae (**one page or less**)
+%% (this is Sarah's formatting, not sure how it compares to the other examples)
+\vita
+\Large
+\vspace*{-0.4truein}
+\centerline{{\bf Mirza Akbar Shah}}
+
+\medskip
+
+\large
+\centerline{{\bf Education}}
+\normalsize
+
+\smallskip
+
+\par\noindent
+\textbf{\textit{The Pennsylvania State University}}\, University Park, Pennsylvania\hfill 2006--Present
+
+\smallskip
+
+\par\noindent
+\hspace{0.10truein}  
+\parbox{6.15truein}{
+\par\noindent
+M.S. in Computer Science \& Engineering, expected in July 2011}
+
+\medskip
+
+\par\noindent
+\textbf{\textit{The Pennsylvania State University}}\, University Park, Pennsylvania\hfill 2001--2005
+
+\smallskip
+
+\par\noindent
+\hspace{0.10truein}  
+\parbox{6.15truein}{
+\par\noindent
+B.S. in Computer Science
+}
+
+\medskip
+
+\large
+\centerline{{\bf Awards and Honors}}
+\normalsize
+
+\smallskip
+
+\par\noindent
+John K. Tsui Scholarship\hfill2004--2005\\ 
+PSU Board of Trustees Scholarship \hfill2003--2004\\
+
+\medskip
+
+\large
+\centerline{{\bf Research Experience}}
+\normalsize
+
+\smallskip
+
+\par\noindent
+\textbf{\textit{Graduate Research}}\, The Pennsylvania State University\hfill2007--Present
+\par\noindent
+Thesis Advisor: Prof. John Hannan
+
+\smallskip
+
+\par\noindent
+\hspace{0.10truein}  
+\parbox{5.7truein}{
+\par\noindent
+This research involved the development of a domain-specific programming language for autonomous underwater vehicles (AUVs). This language allows users of AUVs to specify missions in a very high level language and have a virtual machine process that specification and develop a plan to accomplish it. The virtual machine can dynamically replan the missions as necessary to accomplish the goals specified. The language semantics are customizable through a modular, component development system via a well-defined application programmer interface (API).
+}
+
+\medskip
+
+\par\noindent
+\textbf{\textit{Professional Research}}\, The Pennsylvania State University Applied Research Lab\hfill2005--Present
+\par\noindent
+
+\smallskip
+
+\par\noindent
+\hspace{0.10truein}  
+\parbox{5.7truein}{
+\par\noindent
+Researcher and software engineer involved with development of autonomous systems for next-generation military applications, particularly in the area of undersea warfare.
+}
+
+\end{singlespace}
+\end{document}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 

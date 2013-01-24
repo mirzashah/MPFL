@@ -1,0 +1,72 @@
+This file is a description of the files included in psuthesis.tar.
+These files were assembled in Fall 2005 by M. Stark (original files
+written by Stephen G. Simpson, Math Dept., and are available to
+download from http://cac.psu.edu/etd/howto/tex/index.html).  Some of
+the files in this tared version were modified from the original
+versions specifically for Astronomy Dept. use, and others were
+modified to include new Thesis Office requirements (i.e., inclusion of
+a "Committee Page" in the eTD in place of a "Signature Page", but
+keeping the "Signature Page" around to be printed, signed, and turned
+into the Thesis Office to keep on record).
+
+
+
+"apj.bst" - a slightly altered version of the ApJ bibliography style
+which actually works much better than the version installed on some
+department computers (mainly this version can deal with two
+first-author papers published in the same year, whereas the version on
+my work computer could not).  To use this version, simply keep it in
+the directory where you compile your thesis file.
+
+"ayphdthesis_mod.bst" - BibTeX bibliography format file which makes
+bibs that look like the psuthesis.bst format (this format is
+unnecessary, and makes for an insanely long bibliography section),
+however it allows the (Author year) citation style in the text**
+
+"deluxetable.sty" - allows use of AASTeX deluxetables in your thesis
+
+"doublespace.sty" - this has to do with allowing the thesis to be
+double spaced, it is called by psuthesis.cls (double spacing is not
+necessary for an eTD, but it is necessary for a paper thesis [2004
+guidelines], it is also used for formatting the title page - so you
+can't get rid of it if you are doing an eTD)
+
+mythesis.tex - "example" thesis file, with lots of comments and
+directions, this is a good place to start your own thesis from
+
+"psuthesis.bst" - the "original" bibliography format file (I never
+actually used this because the alternate one ayphdthesis_mod.bst
+allowed the "(author year)" citation style, while this one does not)**
+
+"psuthesis.cls" - the actual class file to format everything properly
+following the correct thesis guidelines
+
+"psuthesis2side.cls" - similar to psuthesis.cls, but adjusts the way
+the margins and page numbers are positioned so the thesis can be
+printed double-sided (like a book).  THIS FORMAT IS NOT AN ACCEPTABLE
+FORMAT TO SUBMIT A FINAL (PRINTED OR eTD) PSU THESIS!  However, it is
+a lot nicer for making double-sided, printed/bound copies for your own
+personal use or to give to your committee members.  If you want to use
+the two-sided format, then replace the declaration
+"\documentclass[11pt]{psuthesis}" at the start of mythesis.tex with
+"\documentclass[11pt]{psuthesis2side}".
+
+
+
+** = according to the grad school thesis guide (c2005), there is no
+  special formating required for the bibliography: "you will need to
+  follow a scholarly style manual in your field or perhaps a recent
+  issue of a leading journal as a guide in compiling this section of
+  the thesis". So, instead of using either of these two bibliography
+  styles, it is perfectly OK to just use "apj" to get citations which
+  we are all familiar with (i.e., enter "\bibliographystyle{apj}" in
+  place of either "psuthesis" or "ayphdthesis", apj "should" be
+  already known to latex so you shouldn't have to download it
+  specially). The apj style is currently the one included in the
+  example thesis file (although the ayphdthesis_mod is written in
+  there, but commented out, so it is easy to switch between them).
+  One Note: I had problems with the version of apj.bst installed on my
+  work computer: it could not deal with two first-author papers
+  published in the same year. I found a slightly altered version which
+  actually works much better. The altered version is what I have made
+  available in this tar file.

@@ -1,0 +1,10 @@
+ocamlc -c MPFLTypes.ml
+ocamlyacc -v mpflParser.mly
+ocamllex mpflLexer.mll
+ocamlc -c mpflParser.mli
+ocamlc -c mpflParser.ml
+ocamlc -c mpflLexer.ml
+ocamlc -c MPFLPrettyPrint.ml
+ocamlc -c driver.ml
+ocamlc -o driver mpflLexer.cmo mpflParser.cmo MPFLPrettyPrint.cmo driver.cmo 
+

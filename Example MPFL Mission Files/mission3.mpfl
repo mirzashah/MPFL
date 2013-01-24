@@ -1,0 +1,32 @@
+Plan ReturnAndReportMissionComplete
+(
+	Transit goToPickupZoneSubmerged(Destination = GeoPosition(Lat=Degrees(32.4), Lon=Degrees(-122.5), Depth=Meters(20.0))
+    Loiter awaitPickupAtSurface(LoiterPosition = GeoPosition(Lat=Degrees(32.4), Lon=Degrees(-122.5), Depth=Meters(0.0)))
+    PhoneHome reportStatus(PhoneHomeRate = Hertz(0.1));
+	Do(goToPickupZoneSubmerged > (awaitPickupAtSurface || reportMission))
+)
+
+Plan Return 
+
+
+
+Plan Search
+
+Plan foo
+(
+    ExecutePlan a(UserPlanName = moo)
+    ExecutePlan b(UserPlanName = moo)
+    PowerConstraint p(MaxLoad = Watts(1000.2), MaxEnergy = Joules(300.1))
+     
+    Do((a > b) with p)
+    
+    OnInfeasible
+    (
+    	Case(a->chillOut)	(Retract(a->chillOut))
+    )
+    OnConflict
+    (
+    	Case(a, b) (Disable(a,b))
+    	Case(a->chillOut, b) (Disable(a->chillOut))
+    )
+)

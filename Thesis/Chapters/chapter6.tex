@@ -1,0 +1,350 @@
+% Chapter 6 - Master's Thesis 
+% Mirza A. Shah
+
+\chapter{A Complete Demonstration System}
+
+In order to demonstrate how to use MPFL and to test the prototype framework, a demonstration system was created using MPFL. A demonstration set of planners and a knowledge base were created. A simple MPFL client application was created which controls a simulated robot. One can see what the robot is doing in real-time on a map display.
+
+\section{Demonstration System Architecture}
+The system consists of 3 components:
+\begin{itemize}
+\item \textit{Demo Client} - The application that uses MPFL to autonomously control a robot.
+\item \textit{AUV Simulator} - A simple, real-time simulator for an autonomous underwater robot.
+\item \textit{Map Display} - A geographical map display showing the autonomous vehicle position and orientation as well as other mission data.
+\end{itemize}
+
+\RefPicture{MPFL_Demo_Block_Diagram.png} shows a system data flow diagram between these components. The following sections describe the implementations of these components.
+
+\InsertPicture{MPFL_Demo_Block_Diagram.png}{0.25}{Data flow block diagram of MPFL demo}
+
+\section{Demo Client Application}
+MPFL requires a client application to link against and call the MPFL compiler. The client application bootstraps the system with a set of planners and a knowledge base. \RefPicture{MPFL_Demo_Client_Internals.png} depicts the internals of the demo client as a system block diagram. The planners and knowledge base are subclassed from the API provided base classes. The demo client is very simple and described the following algorithm:
+
+\begin{enumerate}
+\item Initialize MPFL with the \Code{initialize\_mpfl} API call passing in the MSL file, knowledge base, and planners.
+\item Invoke the \Code{build\_schedules} API call.
+\item Parse returned schedules and issue commands as dictated by the schedule.
+\item Goto 2.
+\end{enumerate}
+
+\InsertPicture{MPFL_Demo_Client_Internals.png}{0.25}{Internals of MPFL demo client}
+
+\section{AUV Simulator and Map Display}
+To demonstrate MPFL, a simple simulator of an AUV was created encompassing basic kinematics, sensing, and power usage. A map display is used to show what the AUV is doing as well as portraying additional information about what the AUV is \textit{thinking} based on its current set of schedules.
+
+\section{The Planner Hierarchy}
+\InsertPicture{exampleplannerhierarchy.png}{0.25}{Example planner hierarchy}
+\RefPicture{exampleplannerhierarchy.png} depicts the planner graph for the demonstration system. Recall that the purpose of the hierarchy is to allow planners to break its own problems (encoded as plan instances) into smaller problems for its children planners.  The subsequent sections will describe the implementation of each demonstration planner and define the following planner aspects:
+\begin{itemize}
+\item Callback \Code{on\_ready\_to\_running}
+\item Callback \Code{on\_forcerun\_to\_running}
+\item Callback \Code{on\_running\_to\_complete}
+\item Callback \Code{on\_ask\_for\_subproblems}
+\item Schedule Encoding
+\item Callback \Code{build\_schedule}
+\end{itemize}
+
+\section{Demo \Code{UseAutopilot} Planner}
+The \Code{UseAutopilot} planner poses a difficult problem where each plan instance represents a single waypoint. The waypoint must be reached within the end window and must not be attempted at any time outside the start window. The scheduling algorithm must choose a sequence of waypoints, calculating when to leave and when to arrive. A valid solution to the problem must not violate these constraints otherwise it should cause an infeasibility or conflict error. This problem is very similar to the \emph{traveling salesman problem}, meaning that the best known algorithm to find the most optimal path is in computational complexity class $NP$. However we do not require the optimal path, but rather just a feasible path that meets all constraints. It would be ideal if the feasible path was optimal or as close to optimal as possible so as to reduce resource usage. A simple genetic algorithm that runs in worst-case $O(n^2)$ time was employed to search for a feasible path that can meet all constraints. The algorithm iteratively improves the best known solution, even if currently infeasible. This is ideal as the planner is able to schedule once a feasible solution is found, but can continue to improve the schedule quality as the robot's mission progresses.
+
+\subsection{Callback \Code{on\_ready\_to\_running}} 
+The example planner has all the ready plan instances go into a running state. The scheduler attempts to schedule all problems immediately so it makes sense to do this.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All plan instances that were forced to run (likely due to a parallel ($||$) operator in the mission specification) are also switched to a running state. If the time constraints for each of these instances is within their start window, they are marked to go into a running state. Those that violate the constraint are not changed and will be disabled by the framework. 
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+As each plan instance represents a waypoint, the first waypoint in the last generated schedule is the one that is currently active as visiting waypoints is a serial operation (i.e. you must visit one waypoint before going to the next). If the current vehicle position (taken from the knowledge base) is within an acceptable threshold distance of the waypoint and the current time is within the end window, it is marked as complete indicating a goal has been achieved. Otherwise the plan instance remains in the running state as do the remainder of plan instances.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+As the \Code{UseAutopilot} planner is a leaf in the planner hierarchy, cannot produce any subproblems, so the return value of this call is always an empty list.
+
+\subsection{Schedule Encoding}
+The schedule is encoded as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time to start heading for the waypoint.
+\item \textbf{End Time} - The time the robot is expected to arrive at the waypoint.
+\item \textbf{Name} - The name of the plan instance associated with the waypoint.
+\item \textbf{Command} - A simple string indicating a latitude, longitude, and depth (e.g. \Code{"Lat = 32.0, Lon = -122.0, DepthMeters = 10.0"}).
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+This callback implements the genetic algorithm that performs scheduling. The goal of the algorithm is to create an ordering of all waypoints specified by each plan instance in the \Code{On(RUN)} state. The algorithm must calculate not only an order, but determine the time at which the robot leaves the waypoint and goes to the next while staying within its time constraint. In order to do this, it must also predict when it expects to leave each waypoint and go to the next. 
+
+\subsubsection{Representing and Rating a Solution}
+Each potential solution to the problem is an order of waypoints $<w_1, w_2,..., w_n>$. We also introduce a special waypoint $w_0$ that represents the current position. In addition to the ordering, the solution must encode what time to leave from each waypoint to arrive at the next and at which speed. A simple way to reason about the problem is to build a table like the one depicted by \RefTable{waypointscheduling}. Each row represents a waypoint. The table is built row by row, each row depending on the previous. The first row refers to the current position, so the arrival time is whatever the current time is. The departure time is then calculated based on the start time constraint of the subsequent waypoint. If the start window for the next waypoint has not yet arrived, the AUV waits at its current position and heads for the waypoint at the start time of that window. If the start window is happening now, the departure time is set to the current time. If the window was in the past, the departure time is set to the current time as well (i.e. leave immediately even though we are running late). The arrival time for the next row is represented by the following function:
+
+\begin{center}
+$arrivalTime_i = departureTime_{i-1} + distanceToNextPoint_{i-1} / maxSpeedOfRobot$
+\end{center}
+
+\begin{table}[htpb]
+\centering
+\begin{tabular}{|p{2cm}|p{1.9cm}|p{2.3cm}|p{1.8cm}|p{1.8cm}|p{2.2cm}|}
+\hline \textbf{Waypoint} & \textbf{Arrival Time} & \textbf{Distance to Next Point} & \textbf{Departure Time} & \textbf{Departure Speed} & \textbf{Slack/Tardy} \\
+\hline \Code{$w_0$} & 10:00 PM & 1000.0 & 10:00 PM & 0.5 & 0\\ 
+\hline \Code{$w_1$} & 10:30 PM & 500.0 & 10:45 PM & 0.5 & 60\\ 
+\hline \Code{$w_2$} & 11:00 PM & 1500.0 & 11:10 PM & 0.5 & 100\\ 
+\hline \Code{$w_3$} & 11:55 PM & 250.0 & 1:00 AM & 0.5 & -50\\ 
+\hline \Code{$w_4$} & 1:08 AM & 0.0 & $\infty$ & 0 & 30\\ 
+\hline 
+\end{tabular} 
+\caption{Determining Solution Fitness} \label{tbl:waypointscheduling}
+\end{table}
+
+The table also contains fields for departure time and departure speed. The algorithm always attempts to have the robot depart as soon as possible: the maximum of the current time and the beginning of the start window of the next waypoint. The robot then heads at maximum speed towards the next waypoint. If the robot arrives within the end window of the next waypoint, the slack/tardy value in the table is filled with the time remaining in the window indicating how early the robot is (i.e. the slack). If the robot is late and missed the end of the end window, it is assigned a negative value with the amount of time it late by (i.e. tardiness). If the robot arrives before the beginning of the next time window, the speed is reduced so that the AUV arrives at the beginning of the end window of the target waypoint. 
+
+The table can then be used to calculate the \Definition{fitness of the solution}. In other words, the table tells us a lot about the ordering of waypoints. Anywhere there is a negative value in the slack/tardy box, it means the solution is infeasible. If all are greater than or equal to zero, it means the solution is feasible. 
+
+\subsubsection{Comparing Solutions}
+However, some feasible solutions are better than others. This also holds for infeasible solutions, some are worse than others. The slack/tardy value can be utilized to give a goodness of the solution by calculating the \emph{total slack} and \emph{total tardy values} as defined by the following equations where $i$ refers to the slack/tardy value:
+
+\begin{center}
+$TotalSlack = \sum{i}, \forall i > 0$
+
+$TotalTardy = \sum{i}, \forall i < 0$
+\end{center}
+
+A solution which has a total tardy less than 0 means it is infeasible, whereas all the remaining are feasible. For feasible solutions, the ones with more slack can be considered \textit{better} than the others, whereas with infeasible solutions, the lower number (i.e. less negative) solutions are \textit{not as bad} as the ones lower than it.
+
+\subsubsection{Finding the Solution - Genetic Algorithm}
+There are $n!$ ways to arrange the waypoints, so in the worst case any algorithm would be $O(n!)$. However this is very bad and would not work very well beyond a dozen or so waypoints. What is worse is that if all solutions are infeasible, we might need to remove waypoints, giving a total complexity of $O(^nC_n + ^nC_{n-1} + ... + ^ nC_0)$ which is $\le O(3n!) = O(n!)$. A simple genetic algorithm to perform a heuristic base search can be employed to get around this.
+
+A genetic algorithm works by representing each solution as a \Definition{member} of a \Definition{population} of solutions. The algorithm is bootstrapped by creating a population of some size $n$ where the solutions are randomly generated, in this case random orderings of waypoints. The fitness of each solution is based on the algorithm mentioned earlier. All solutions have their fitness rated. The fittest members of the population are chosen to live and \emph{reproduce} whereas the others are \emph{killed} off. The percentage that gets to live is an empirically determined number (10-15\% is a good starting point). The remainder of the population is then regenerated in a process called \Definition{breeding} by randomly picking members of the surviving population and \emph{mutating} a copy of them to form a new \Definition{offspring}. The mutation in this algorithm simply swaps two random waypoints. The breeding continues until the population is restored to its original size. Typical genetic algorithms also employ a \emph{crossover} operation which have breeding solutions exchange parts of themselves to create members of the new population, but that is not utilized as that is difficult to employ with this problem and not really necessary.
+
+\subsubsection{Performance}
+The genetic algorithm runs in $O(n^2)$ time. After generating a population, for each solution the fitness information can be determined in linear time ($O(n)$). The solutions then have to be sorted by fitness scores which we know in the worst case can be ($O(n^2)$). Regenerating the next population from the remainder is also a $O(n)$ operation resulting in an overall complexity of $O(n^2)$. Genetic algorithms can quickly converge to a feasible solution if the feasible space is large. The smaller it gets, the more time it will likely take to find the solution, eventually to the point where it is as poor as brute force. However, in practice if the plan specification in the MSL is reasonable, the algorithm does quite well.
+
+\subsubsection{Failure to Converge}
+As mentioned in the previous chapter, the callback functions should not block the MPFL engine. The algorithm should run either in a thread or run for some number of generations and then stop. In the actual implementation, the latter is chosen. The algorithm runs for a set number of generations and if it does not converge, it means there's an infeasibility somewhere. One waypoint is thrown away from the set of waypoints based on the tardy information (i.e. the waypoint with the worst tardy value is thrown away) and the algorithm runs again. The algorithm keeps removing waypoints till a solution is found or all waypoints are removed. Once a solution is found, the \Code{build\_schedule} call returns a schedule infeasibility passing the names of the instances that were removed to get a feasible solution. This will invoke the error handling potentially disabling or retracting plan instances.
+
+\subsubsection{Accounting for Blocked Instances}
+The genetic algorithm is performed not only on instances in the \Code{On(RUN)} state, but also those in the \Code{Off(BLOCK)} state. When a schedule is formed, all the \Code{Off(BLOCK)} states are removed from the schedule and the \Code{On(RUN)} instances are bumped up the list. The idea is that if any of the instances become unblocked, there is a good chance that it will be able to achieve the goal as the detour for the newly unblocked instances will be minimal. This may not necessarily hold true, but in practice it was found this heuristic works quite well. The ability to account for blocked instances means that the planning is more deliberative and the planner can handle scheduling operations well, especially for heavy uses of the serial ($>$) operator which causes blocking.
+
+\subsubsection{Improvement over Time and Solution Caching}
+As genetic algorithms retain the best solutions, the schedule chosen can only improve. The best solution is chosen for each potential length of the waypoint list of sizes $n$ down to those of size $1$ and are included as members of the initial population for the next \Code{build\_schedule} in addition to the randomized solutions. Even if waypoints are added and removed, the algorithm will continue to work.
+
+\section{Demo \Code{Transit} Planner}
+The \Code{Transit} planner differs from the \Code{UseAutopilot} planner as each of its plan instances represents a list of waypoints that are visited sequentially rather than a single waypoint. This can easily be implemented by utilizing the \Code{UseAutopilot} planner defined before which is a child planner in the planner graph.
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+This callback leaves plan instances as \Code{On(READY)}. The \Code{UseAutopilot} planner will handle switching lifetime state.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+In this callback, the planner opts to set the plan instances to an \Code{On(RUNNING)} state. If there is any infeasibility it will occur in the child planner.
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The plan instance will automatically turn to complete when all the \Code{UseAutopilot} children instances complete.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+One can create a set of \Code{UseAutopilot} plan instances to represent each waypoint in the list of waypoints. The \Type{userPlanExp} for each \Code{Transit} plan instance with waypoints $<w_1,...,w_n>$ can be formed by using the serial operator on each \Code{UseAutopilot} plan instance as follows:
+
+\begin{center}
+$w_1 > w_2 > ... > w_n$
+\end{center}
+
+Below is the equivalent code in OCaml code using the MPFL API. The \Code{Destination} value is omitted but should contain the respective position in practice. One can keep nesting \Code{Op} constructors with the \Code{SERIAL} value as the operator type.
+
+\begin{verbatim}
+Op(SERIAL, Op(SERIAL, PlanInst("w_1", UseAutopilot(Destination = ...), 
+              PlanInst("w_2", UseAutopilot(Destination = ...))), 
+           ...           
+           PlanInst("w_n", UseAutopilot(Destination = ...)))
+\end{verbatim}
+
+The planner should only create these children problems on bootstrap or if during runtime the set of \Code{UseAutopilot} plan instances changes. The latter can be detected easily via an API call.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time to start heading to the first waypoint.
+\item \textbf{End Time} - The time the robot arrives at the last waypoint.
+\item \textbf{Name} - The name of the plan instance associated with the waypoint list.
+\item \textbf{Command} - A command is not needed here, the value is just set as \emph{``Perform Transit"}. However encoding the list of waypoints may be useful.
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+As all the work is done by the \Code{UseAutopilot} planner. The \Code{Transit} planner can access the schedule returned by the \Code{UseAutopilot} planner to build its own schedule. For each \Code{Transit} plan instance, one can look at the smallest start time and largest end time of all its children instances in the \Code{UseAutopilot} schedule. For each \Code{Transit} instance a row can be added to the schedule. This can be automated using the \Code{ScheduleAutobuild} return value.
+
+\subsection{Performance}
+The performance is based on that of the \Code{UseAutopilot} planner, the complexity of the path, and the tightness of all constraints. Most of the plan instances will be blocked because of the user of the serial ($>$) operator. However, as the \Code{UseAutopilot} planner accounts for blocked instances, the planner performs reasonably well. In fact it can intertwine two paths if they overlap.
+
+\section{Demo \Code{Loiter} Planner}
+The \Code{Loiter} planner also utilizes the \Code{UseAutopilot} planner like the \Code{Transit} planner. A \Code{Loiter} is simply going to a waypoint with a departure constraint.
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+All are activated to be in the \Code{On(RUN)} state
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All are activated to be in the \Code{On(RUN)} state
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The \Code{UseAutopilot} planner will implicitly complete the loiter once the waypoint is completed.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+For each \Code{Loiter} plan instance, we need to create a single \Code{UseAutopilot} plan instance. A loiter problem not only has a destination, but a loiter duration. The \Code{Loiter} planner has access to the \Code{UseAutopilot} planner's schedule, so it simply looks at the arrival time for the plan instances it created and creates a time constraint adding the loiter duration time to it.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time to start heading to the loiter point.
+\item \textbf{End Time} - The time the robot leaves the loiter point.
+\item \textbf{Name} - The name of the plan instance associated with the loiter task.
+\item \textbf{Command} - A command is not needed here, the value is just set as \emph{``Perform Loiter"}.
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+The schedule for the \Code{Loiter} plan instance is based on the start and end time of each \Code{UseAutopilot} plan instance. One extracts all entries from the child planner's schedule and maps each child instances start and end times to the ones used in each \Code{Loiter} schedule row. Each row uses the parent \Code{Loiter} plan instance name as the identifier for each row. Again, the \Code{ScheduleAutobuild} option can be used to do this automatically.
+
+\section{Demo \Code{UseAcoustic} Planner}
+The \Code{UseAcoustic} planner has the responsibility of scheduling use of the acoustic communication medium (i.e. the water) for acoustic devices such as sonars and acoustic modems. Each \Code{UseAcoustic} plan instances defines the acoustic problem as a frequency band, the duration of time required for an acoustic \Definition{pulse} (i.e. a chunk of acoustic time), the minimum spacing gap between the pulses as a duration, the maximum spacing gap between pulses, and the total number of pulses needed.
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+All instances are set to a running state.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All force running tasks are set to running as well.
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The plan instance will automatically turn to complete when all the \Code{UseAutopilot} children instances complete.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+This is a leaf planner so no subproblems are generated.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time the first acoustic pulse is issued
+\item \textbf{End Time} - The time the last acoustic pulse is issued
+\item \textbf{Name} - The name of the \Code{UseAcoustic} plan instance associated with the row
+\item \textbf{Command} - The command encodes a frequency band, the start time of the first pulse, the start time of the last pulse, the spacing between pulses, and the duration of each pulse
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+A simple \Definition{linear program} can be used to build the schedule. A linear program is an optimization technique for an optimization problem with a single objective function and a set of constraints which are defined as a set of inequalities. The constraints must be linear. The program can then be solved utilizing a linear program solver, such as the \Definition{simplex method}. For sake of brevity, the algorithm is not defined. However, the approach is quite straightforward: model each discrete block of acoustic time as a set of variables in the linear program. Each block can be defined by variables indicating start time and end time. Constraints can then be developed around these variables to ensure constraints are met (e.g. minimum and maximum gap constraints). 
+
+Additionaly a similar approach to the \Code{UseAutopilot} planner can be used where a genetic algorithm searches for a feasible schedule. Other \textit{evolutionary algorithms} such as \textit{swarm optimization} and \textit{simulated annealing} would also likely work.
+
+\section{Demo \Code{UseSonar} Planner}
+The \Code{UseSonar} planner activates an \Definition{active sonar} device or polls a \Definition{passive sonar} for sensing. Active sonar determines how far away objects are by emitting a sound pulse (called a \Definition{ping}) and measuring the amount of time it takes for the sound to return in order to determine range. The further an object is, the more time it takes to receive the reflected ping. The \Definition{ping rate} of a \Code{UseSonar} instance determines how quickly the user wants to ping. As the sonar is competing with other acoustic devices such as additional sonar sensors or an acoustic modem, it must make sure not to interfere with those devices. The \Code{UseAcoustic} planner can be used by acoustic devices to allocate chunks of acoustic bandwidth for such a purpose.
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+All instances are set to a running state.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All force running tasks are set to running as well.
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The plan instance will automatically turn to complete when all the \Code{UseAcoustic} children instances complete.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+For each \Code{UseSonar} instance, we want to create a \Code{UseAcoustic} instance where the acoustic band matches that of the sonar, the block duration size is however long the sonar needs to ping and receive (active case) or to poll the sensor (passive case), and the spacing between blocks (min gap and max gap) are set to appropriate values depending on sonar type. The number of pulses is based on how long the search needs to be conducted for.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time to issue the first ping or poll
+\item \textbf{End Time} - The time the last ping or poll is finished
+\item \textbf{Name} - The name of the plan instance associated with the \Code{UseSonar} request
+\item \textbf{Command} - The command encodes a frequency band, the start time of the first ping/poll, the start time of the last ping/poll, the spacing between pings/polls, and the duration of each ping/poll
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+Building the schedule is quite easy. As the \Code{UseSonar} planner has access to the \Code{UseAcoustic} schedule, it can inspect that schedule and determine at which times the acoustic channel is allocated to it under what conditions. The command within the \Code{UseAcoustic} schedule is almost identical to that in the \Code{UseSonar} schedule with the only difference being terminology (e.g. calling it a ping/poll instead of a pulse). Again the \Code{ScheduleAutobuild} option may be used to automate this.
+
+\section{Demo \Code{UseModem} Planner}
+The \Code{UseModem} planner is used for scheduling the use of an acoustic modem. An acoustic modem is similar to a dial-up modem found commonly in personal computers, rather than modulating electromagnetic frequencies over the voice channel of a telephone line, it creates pulses of sound encoding digital data that travel through water. The \Code{UseModem} planner is very similar in operation to the \Code{UseSonar} planner in that it requires the use of the \Code{UseAcoustic} planner as well so as not to interfere with any other acoustic devices. Each \Code{UseModem} plan instance encodes the name of the modem to use (in the event multiple modems exist) and  message which is a simple string of text (8-bit ASCII encoded).
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+All instances are set to a running state.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All force running tasks are set to running as well.
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The plan instance will automatically turn to complete when all the \Code{UseAcoustic} children instances complete.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+For each \Code{UseModem} instance, we want to create a \Code{UseAcoustic} instance where the acoustic band matches that of the modem. The block duration size is however long the modem needs to transmit its message and receive acknowledgment. Calculating the one-way transmit time is based on the size of the message in bits divided by the predicted bit rate of the modem\footnote{The predicted bit rate is a function of several variables including distance to receiver, environmental noise, concentration of impurities in the water, and depth.}. The min gap is set to zero and the max gap is set to whatever tolerance is appropriate for the \Code{UseModem} planner. The number of pulses is equal to the number of retries the user is willing to go for in the event one fails.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time of the first message send attempt.
+\item \textbf{End Time} - The time the last message send attempt finishes.
+\item \textbf{Name} - The name of the plan instance associated with the \Code{UseModem} request.
+\item \textbf{Command} - The command encodes a frequency band, the start time of the first message transmit attempt, the start time of the last retransmission attempt, the spacing between retransmission attempts, and the duration of time available for each transmission attempt.
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+Building the schedule is quite easy and similar to the way the \Code{UseSonar} schedule is built. As the \Code{UseModem} planner has access to the \Code{UseAcoustic} schedule, it can inspect that schedule and determine at which times the acoustic channel is allocated to it under what conditions. The command within the \Code{UseAcoustic} schedule is almost identical to that in the \Code{UseModem} schedule with the only difference being terminology (e.g. calling it a \textit{transmission attempt} instead of a \textit{pulse}). Again the \Code{ScheduleAutobuild} option can be used to automate this.
+
+\section{Demo \Code{PhoneHome} Planner}
+The \Code{PhoneHome} planner is a way to send status and sensory information of the vehicle back to some operating platform (e.g. the launch platform or an onshore command center). In our planner hierarchy, the \Code{PhoneHome} planner utilizes the \Code{UseModem} child planner to achieve this.
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+All instances are set to a running state.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All force running tasks are set to running as well.
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The plan instance will automatically turn to complete when all the \Code{UseModem} children instances complete.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+The \Code{PhoneHome} planner creates a child \Code{UseModem} plan instance for each of its own plan instances. Each plan instance encodes the name of the modem to use and the rate at which to report home.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time to start phoning home
+\item \textbf{End Time} - The time the phoning home operation ends
+\item \textbf{Name} - The name of the plan instance associated with the \Code{PhoneHome} request
+\item \textbf{Command} - No command is needed, so each entry just says ``Performing PhoneHome operation"
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+The \Code{PhoneHome} planner schedule is built from the \Code{UseModem} planner's schedule. The start time and end time correspond to the start time of the first entry referencing the child \Code{UseModem} instance in the \Code{UseModem} schedule. The end time similarly refers to the last schedule entry's end time. Again the \Code{ScheduleAutobuild} option can be used to automate this.
+
+\section{Demo \Code{Search} Planner}
+The final example planner in the system is the \Code{Search} planner. What makes this planner more interesting than the others is that it is the only one to use more than one child planner, in this case \Code{Transit} and \Code{UseSonar}. The search planner's duty is to traverse some giving area and look for objects of interests. Objects of interest may include other vessels, mines, surface ships, or the seabed (e.g. bottom mapping). The traversal is done via the use of child \Code{Transit} plan instances and the scanning is done with child \Code{UseSonar} plan instances.
+
+\subsection{Callback \Code{on\_ready\_to\_running}}
+All instances are set to a running state.
+
+\subsection{Callback \Code{on\_forcerun\_to\_running}}
+All force running tasks are set to running as well.
+
+\subsection{Callback \Code{on\_running\_to\_complete}}
+The plan instance will automatically turn to complete when all the \Code{UseSonar} and \Code{Transit} children instances complete.
+
+\subsection{Callback \Code{on\_ask\_for\_subproblems}}
+The \Code{Search} problem is specified as an area, a lane width, and sensor. The example planner assumes the area to be a rectangle. If it is not specified as such in the MSL, a rectangular hull is calculated using the MPFL API. The rectangle is broken up into strips. The strips are oriented horizontally if the width of the rectangle is longer than the height, and vertically in the reverse case. If the area is square, the strip orientation can be chosen arbitrarily. A set of waypoints is calculated that represent a \Definition{lawnmower search path}, where each strip is traversed down the center from end to end, then the robot turns, moves into the next strip, and starts moving in the reverse direction (i.e. like a lawnmower) (\RefPicture{demo_search_planner_path.png}). These waypoints are encoded within a single \Code{Transit} plan instance, where each \Code{Search} plan instance has a \Code{Transit} instance encoding the search path. As for sensing, for each \Code{Search} plan instance we also create a \Code{UseSonar} plan instance specifying parameters appropriate to the type of search the planner is built for.
+
+\InsertPicture{demo_search_planner_path.png}{0.25}{Demo \Code{Search} planner creates waypoints for \Code{Transit} planner}
+
+The two tasks depicted by each \Code{Transit} and corresponding \Code{UseSonar} plan instance must happen in parallel. Hence the subproblem for each \Code{Search} plan instance is represented as:
+\begin{center}
+$t ~ || ~ us$
+\end{center}
+where $t$ is the name of the \Code{Transit} plan instance and $us$ is the name of the \Code{UseSonar} plan instance.
+
+\subsection{Schedule Encoding}
+The schedule encoding is as follows:
+\begin{itemize}
+\item \textbf{Start Time} - The time the search commences.
+\item \textbf{End Time} - The time the search ends.
+\item \textbf{Name} - The name of the plan instance associated with the \Code{Search} request.
+\item \textbf{Command} - No command is needed, so each entry just says \textit{``Performing search operation"}.
+\end{itemize}
+
+\subsection{Callback \Code{build\_schedule}}
+The \Code{Search} schedule row entries map to the rows referecing the children \Code{Transit} instances within the \Code{Transit} schedule. Each entry in the \Code{Search} schedule has a start time/end time corresponding to the start time/end time of the transit operation. Again the \Code{ScheduleAutobuild} option can be used to automate this.
+
+\section{Segue: Results, Performance, and Related work}
+This chapter concludes a description of the planners that constitute a demonstration of a  total planning autonomy solution for an AUV. Unfortunately due to time, not all of the planners could be implemented fully, though they will be implemented in the future. However, algorithms were given for each planner.
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "mythesis"
+%%% End: 

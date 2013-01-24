@@ -1,0 +1,19 @@
+%Default scenario, Seahorse and 2 tracks in Dabob Bay
+%----------------------------------------------------
+%lines beginning with % are comments
+%lines beginning with a are assets
+%lines beginning with t are tracks
+%
+%Assets
+%----------------------------------------------------
+%   nodeID >> nodeName >> latitude   >> longitude  >> depthInMeters >> headingInCompassDegrees >> sensorRangeInMeters >> maxSpeedInMetersPerSecond >> powerLife >> powerDrainConstant >> acceleration(m/s^2) >> turnRate (deg/sec)
+a   1         Seahorse   20.16  -154.97    15                  23.45                      4000                   150                         1025         0.0002778             5.0                  50
+%
+%
+%Tracks
+%----------------------------------------------------
+%
+% For tracks, there is a list of attributes that are repeated (starting with speed). These are points along a path, each with a speed,lat, long, depth and speed
+%   trackID >> destinationRadius (m) >> acceleration (m/s^2) >> turnRate (deg/sec) >> speed (m/s) >> latitude >> longitude >> depth (m) >> speed >> latitude >> longitude >> depth ...
+%t   100        20                          0.25                     0.5                 5             47.708      -122.846     20            4        47.707    -122.845       15    3        47.707      -122.840     25
+%t   101        20                          0.75                     2.0                 7             47.705      -122.842     20            5        47.704    -122.840       20    5        47.703      -122.844     20

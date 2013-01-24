@@ -1,0 +1,25 @@
+Plan myMainPlan
+(
+   UseAutopilot w1(Destination = GeoPosition(Lat = Degrees(20.150000), Lon = Degrees(-154.8765001), Depth = Meters(0.0)))
+   UseAutopilot w2(Destination = GeoPosition(Lat = Degrees(20.161001), Lon = Degrees(-154.884002), Depth = Meters(0.0)))
+
+   Transit t3(Waypoints = GeoPosition(Lat = Degrees(20.195004), Lon = Degrees(-154.8911005), Depth = Meters(0.0))
+	                     - GeoPosition(Lat = Degrees(20.196004), Lon = Degrees(-154.9111005), Depth = Meters(0.0))        
+	                     - GeoPosition(Lat = Degrees(20.194404), Lon = Degrees(-154.9011005), Depth = Meters(0.0)))
+
+
+   Loiter l4(LoiterPosition = GeoPosition(Lat = Degrees(20.183003), Lon = Degrees(-154.902004), Depth = Meters(0.0)), LoiterDuration = Minutes(2.0))
+   Loiter l5(LoiterPosition = GeoPosition(Lat = Degrees(20.194804), Lon = Degrees(-154.9311005), Depth = Meters(0.0)), LoiterDuration = Seconds(30.0))   
+ 	                     
+ 
+   Do(w1 & w2 & t3 & l4 > l5)
+   
+   OnInfeasible
+   (
+      Case(w1)(Disable(w1))
+      Case(w2)(Disable(w2))
+      Case(t3)(Disable(t3))
+      Case(l4)(Disable(l4))
+      Case(l5)(Disable(l5))
+   )
+)

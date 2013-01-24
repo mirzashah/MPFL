@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd $MOOS_BASEPATH/MOOSBin
+export MYTERM=gnome-terminal
+  
+$MYTERM  --geometry 40x8+0-0 -t MOOSDB -e ./MOOSDB&
+./uMS&
+
+cd $SOURCE_DIR/MPFL/Debug
+$MYTERM --geometry 30x8+400-0 -t "KML Translator - Penn State University Applied Research Laboratory" -e ./GoogleEarthInterface&
+$MYTERM --geometry 60x8+700-0 -t "Field Simulator - Penn State University Applied Research Laboratory" -e ./FieldSimulator
+
+
+
+

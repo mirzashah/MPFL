@@ -1,0 +1,48 @@
+\newcommand{\Definition}[1]{\textit{\textbf{#1}}}
+\newcommand{\TODO}[1]{\textbf{#1}}
+\newcommand{\InsertPicture}[3]
+{
+	\begin{figure}[htp]
+	\centering
+	\includegraphics[scale=#2]{Images/#1}
+	\caption{#3} \label{fig:#1}
+	\end{figure}
+}
+\newcommand{\Code}[1]{\texttt{#1}}
+\newcommand{\Type}[1]{\emph{#1}}
+\newcommand{\RefTable}[1]{{Table \ref{tbl:#1}}}
+\newcommand{\BrackType}[1]{$<$\emph{#1}$>$}
+\newcommand{\RefPicture}[1]{{{Figure~\ref{fig:#1}}}}
+\newcommand{\CodeCaption}[2]{{Example #1} - #2}
+\newcommand{\Metatype}[1]{$\overline{#1}$}
+
+\newcommand{\LabelSection}[1]{\label{sec:#1}}
+\newcommand{\RefSection}[1]{Section \ref{sec:#1}}
+
+\newcounter{infrulecounter}
+\setcounter{infrulecounter}{0}
+\newcommand{\nextruleid}
+{
+	\addtocounter{infrulecounter}{1}
+	(\arabic{infrulecounter})
+}
+
+\newcommand{\ValueEval}{{\underset{Value}{\hookrightarrow}}}
+\newcommand{\ChangeOnStateEval}{{\underset{ChangeOnState}{\hookrightarrow}}}
+
+\newcommand{\CurrentXorEval}{\underset{CurrentXor}{\hookrightarrow}}
+\newcommand{\CurrentParallelEval}{\underset{CurrentParallel}{\hookrightarrow}}
+\newcommand{\CurrentSerialEval}{\underset{CurrentSerial}{\hookrightarrow}}
+\newcommand{\CurrentGroupEval}{\underset{CurrentGroup}{\hookrightarrow}}
+\newcommand{\CurrentEval}{\underset{Current}{\hookrightarrow}}
+\newcommand{\NextXorEval}{\underset{NextXor}{\hookrightarrow}}
+\newcommand{\NextParallelEval}{\underset{NextParallel}{\hookrightarrow}}
+\newcommand{\NextSerialEval}{\underset{NextSerial}{\hookrightarrow}}
+\newcommand{\NextGroupEval}{\underset{NextGroup}{\hookrightarrow}}
+
+\newcommand{\LSTEval}{\underset{LST}{\hookrightarrow}}
+\newcommand{\PIEval}{\underset{PI}\hookrightarrow{}}
+\newcommand{\EHEval}{\underset{EH}\hookrightarrow{}}
+\newcommand{\OCamlEval}{\underset{OCaml}\hookrightarrow{}}
+
+\newcommand{\MaSTitle}[1]{\begin{flushleft}\textbf{#1}\end{flushleft}}

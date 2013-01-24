@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# MPFL Specific
+cd $SOURCE_DIR/MPFL/Cpp2ML
+make clean
+make
+
+cd $SOURCE_DIR/MPFL/MPFLCore
+make clean
+make
+
+cd $SOURCE_DIR/MPFL/MPFLDemo
+make clean
+make
+

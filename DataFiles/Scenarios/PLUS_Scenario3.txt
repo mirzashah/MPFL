@@ -1,0 +1,32 @@
+%Scenario 3: 13 assets, 5 tracks
+%----------------------------------------------------
+%lines beginning with % are comments
+%lines beginning with a are assets
+%lines beginning with t are tracks
+%
+%Assets
+%----------------------------------------------------
+%   nodeID >> nodeName >> latitude   >> longitude  >> depthInMeters >> headingInCompassDegrees >> sensorRangeInMeters >> maxSpeedInMetersPerSecond >> powerLife >> powerDrainConstant >> acceleration(m/s^2) >> turnRate (deg/sec)
+a   1         Viper      32.910767     -119.036086     15                  0.1                       4000                   5                         12         0.0002778             0.75                  5
+a   2         Jester     33.024824     -118.8752572    15                  15.3                      4000                   5                         12         0.0002778             0.75                  5
+a   3         Maverick   32.790300     -119.043481     15                  275.0                     4000                   5                         12         0.0002778             0.75                  5
+a   4         Iceman     32.879281     -118.89379      15                  35.5                      4000                   5                         12         0.0002778             0.75                  5
+a   5         Charlie    32.947653     -118.89379      15                  40.45                     4000                   5                         12         0.0002778             0.75                  5
+a   6         Cougar     32.717850     -118.036086     15                  180.2                     4000                   5                         12         0.0002778             0.75                  5
+a   7         Wolfman    32.717832     -118.916459     15                  195.543                   4000                   5                         12         0.0002778             0.75                  5
+a   8         Slider     33.061290     -119.377466     15                  123.22                    4000                   5                         12         0.0002778             0.75                  5
+a   9         Merlin     33.238336     -119.069642     15                  75.45                     4000                   5                         12         0.0002778             0.75                  5
+a   10        Sundown    33.165815     -118.682755     15                  93.5                      4000                   5                         12         0.0002778             0.75                  5
+a   11        Hollywood  32.518415     -118.762166     15                  345.11                    4000                   5                         12         0.0002778             0.75                  5
+a   12        Stinger    32.535379     -118.523060     15                  123.89                    4000                   5                         12         0.0002778             0.75                  5
+a   13        Chipper    32.672212     -118.445577     15                  25.11                     4000                   5                         12         0.0002778             0.75                  5
+%
+%
+%
+%Tracks
+%----------------------------------------------------
+%
+% For tracks, there is a list of attributes that are repeated (starting with speed). These are points along a path, each with a speed,lat, long, depth and speed
+%   trackID >> destinationRadius (m) >> acceleration (m/s^2) >> turnRate (deg/sec) >> speed (m/s) >> latitude >> longitude >> depth (m) >> speed >> latitude >> longitude >> depth ...
+t   100        50                          0.25                     2.0                 15           33.2       -119.069642     20            18        32.4       -118.516412       15    8        34.2       -121.069642    25
+t   101        50                          0.75                     3.0                 20           32.4       -118.516412     20            15        33.2       -119.069642       20    14       32.0       -118.216412    20

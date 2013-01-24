@@ -1,0 +1,7 @@
+#!/bin/bash
+
+pkill MPFLDemo
+pkill MOOSDB
+pkill uMS
+pkill FieldSimulator
+pkill GoogleEarthInte

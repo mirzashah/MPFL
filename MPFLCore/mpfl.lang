@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Author: Mirza Shah
+ MPFL Lang file for Use with GTKSourceView
+ This file enables MPFL language syntax highlighting for any app that utilizes GTKSourceView, the canonical example being gedit.
+ Simply place this file into GTKSourceView's language definitions folder, on Ubuntu 10.04, /usr/share/gtksourceview-2.0/language-specs
+-->
+<language id="mpfl" _name="MPFL" version="2.0" _section="Sources">
+
+  <styles>
+    <style id="comment" _name="Comment" map-to="def:comment"/>
+    <style id="string" _name="String" map-to="def:string"/>
+    <style id="character" _name="Character" map-to="def:character"/>
+    <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+    <style id="plantype" _name="PlanType" map-to="def:type"/>
+    <style id="constrainttype" _name="ConstraintType" map-to="def:statement"/>
+    <style id="argumenttype" _name="ArgumentType" map-to="def:constant"/>
+    <style id="argumentlabel" _name="ArgumentLabel" map-to="def:identifier"/>
+    <style id="boolean" _name="Boolean value" map-to="def:boolean"/>
+    <style id="base-n-number" _name="Base-N Integer" map-to="def:base-n-integer"/>
+    <style id="real" _name="Real number" map-to="def:floating-point"/>
+    <style id="number" _name="Number" map-to="def:number"/>
+  </styles>
+
+  <definitions>
+
+	<context id="comment" style-ref="comment">
+		<start>\/\/</start>
+		<end>$</end>
+	</context>
+
+    <context id="string" style-ref="string" end-at-line-end="true" class="string" class-disabled="no-spell-check">
+      <start>"</start>
+      <end>"</end>
+    </context>
+
+    <context id="character" style-ref="string">
+      <match>'.'</match>
+    </context>
+
+    <context id="keywords" style-ref="keyword">
+      <keyword>Plan</keyword>
+      <keyword>Do</keyword>
+      <keyword>with</keyword>     
+      <keyword>if</keyword>
+      <keyword>then</keyword>
+      <keyword>else</keyword>
+      <keyword>endif</keyword>
+      <keyword>LookupInteger</keyword>
+      <keyword>LookupFloat</keyword>
+      <keyword>LookupBool</keyword>
+      <keyword>LookupString</keyword>        
+      <keyword>OnInfeasible</keyword>        
+      <keyword>OnConflict</keyword>              
+      <keyword>Case</keyword>              
+      <keyword>Disable</keyword>              
+      <keyword>Retract</keyword>                    
+    </context>
+
+    <context id="plantypes" style-ref="plantype">
+      <keyword>ExecutePlan</keyword>
+      <keyword>Search</keyword>
+      <keyword>UseAcoustic</keyword>
+      <keyword>UseAutopilot</keyword>
+      <keyword>UseModem</keyword>
+      <keyword>UseSonar</keyword>
+      <keyword>Transit</keyword>
+      <keyword>Loiter</keyword>
+      <keyword>PhoneHome</keyword>
+    </context>
+    
+    <context id="constrainttypes" style-ref="constrainttype">
+      <keyword>TimeConstraint</keyword>
+      <keyword>PowerConstraint</keyword>
+      <keyword>AreaConstraint</keyword>
+      <keyword>WeaponConstraint</keyword>
+    </context>
+        
+    <context id="argumenttypes" style-ref="argumenttype">
+      <keyword>Degrees</keyword>
+      <keyword>Radians</keyword>
+      <keyword>RectangularArea</keyword>
+      <keyword>CircularArea</keyword>            
+      <keyword>PolygonalArea</keyword>      
+      <keyword>Seconds</keyword>      
+      <keyword>Minutes</keyword>
+      <keyword>Hours</keyword>                  
+      <keyword>Joules</keyword>  
+	  <keyword>UTCSeconds</keyword>   
+      <keyword>KilowattHours</keyword>      
+      <keyword>Hertz</keyword>      
+      <keyword>Kilohertz</keyword>      
+      <keyword>Feet</keyword>      
+      <keyword>Meters</keyword>                                    
+      <keyword>Yards</keyword>                                    
+      <keyword>GeoPosition</keyword>                                    
+      <keyword>RelativePosition</keyword>                                    
+      <keyword>Watts</keyword>                                    
+      <keyword>Kilowatts</keyword>                                    
+      <keyword>Horsepower</keyword>                                                                  
+      <keyword>UnixTime</keyword>                                    
+      <keyword>ClockTime</keyword>                                    
+    </context>    
+
+    <context id="argumentlabels" style-ref="argumentlabel">
+      <keyword>Lat</keyword>
+      <keyword>Lon</keyword>
+      <keyword>Depth</keyword>      
+      <keyword>Days</keyword>
+      <keyword>Time</keyword>
+      <keyword>StartTime</keyword>
+      <keyword>EndTime</keyword>           
+      <keyword>Destination</keyword>
+      <keyword>LoiterPosition</keyword>
+      <keyword>Waypoints</keyword>
+      <keyword>UserPlanName</keyword>
+      <keyword>SonarName</keyword>
+      <keyword>SearchArea</keyword>
+      <keyword>TopLeft</keyword>
+      <keyword>BottomRight</keyword>
+      <keyword>LaneWidth</keyword>                        
+      <keyword>ModemName</keyword>
+      <keyword>PhoneHomeRate</keyword>
+      <keyword>SonarName</keyword>
+      <keyword>Message</keyword>
+      <keyword>AcousticDevice</keyword>        
+      <keyword>TaskDuration</keyword>
+      <keyword>MinGap</keyword>
+      <keyword>MaxGap</keyword>
+      <keyword>PingRate</keyword>                          
+    </context>    
+        
+    <context id="boolean" style-ref="boolean">
+      <keyword>false</keyword>
+      <keyword>true</keyword>
+    </context>
+
+    <define-regex id="hexnum">[0-9a-f][0-9a-f_]*</define-regex>
+    <define-regex id="exponent">[Ee][+-]?[0-9][0-9_]*</define-regex>
+
+    <context id="base-n-number" style-ref="base-n-number">
+      <match extended="true">
+        (?&lt;![\w\.])
+        [0-9][0-9_]*\#\%{hexnum}(\.\%{hexnum})?\#\%{exponent}?
+        (?![\w\.])
+      </match>
+    </context>
+
+    <context id="real" style-ref="real">
+      <match extended="true">
+        (?&lt;![\w\.])
+        [0-9][0-9_]*\.[0-9][0-9_]*\%{exponent}?
+        (?![\w\.])
+      </match>
+    </context>
+
+    <context id="number" style-ref="number">
+      <match extended="true">
+        (?&lt;![\w\.])
+        [0-9][0-9_]*(E[+]?[0-9][0-9_]*)?
+        (?![\w\.])
+      </match>
+    </context>
+
+    <context id="mpfl" class="no-spell-check">
+      <include>
+        <context ref="comment"/>
+        <context ref="string"/>
+        <context ref="character"/>
+        <context ref="keywords"/>
+        <context ref="plantypes"/>
+        <context ref="constrainttypes"/>        
+        <context ref="argumenttypes"/>
+        <context ref="argumentlabels"/>
+        <context ref="boolean"/>
+        <context ref="base-n-number"/>
+        <context ref="real"/>
+        <context ref="number"/>
+      </include>
+    </context>
+
+  </definitions>
+
+</language>

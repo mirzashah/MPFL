@@ -1,0 +1,142 @@
+\chapter{Preliminaries}
+This chapter is devoted to preliminaries, both notational and
+mathematical.
+
+\section{Notational Preliminaries}
+\label{sec:notation}
+In this section we establish some notation.  The letter $E$ is used
+to denote energy, while $c$ denotes the speed of light.
+
+\section{Mathematical Preliminaries}
+It is very important to use correct mathematical reasoning.
+See also Section~\ref{sec:notation}, where some of our notation is
+explained.
+
+Let us now define the operations of matrix transposition and rotation.  The
+transpose of a matrix, $A$, will be denoted as $A^{\mathrm T}$.  The
+two-dimensional transpose of $A$, which is assumed to be $N_1 \times N_2$, may
+be defined as:
+\begin{equation}
+a^{\mathrm T}_{i_1,i_2} = a_{i_2,i_1} \qquad
+\hbox{for all $1 \leq i_1 \leq N_1$, $1 \leq i_2 \leq N_2$,}
+\end{equation}
+where $a_{i_2,i_1}$ is an individual element of $A$ and similarly for
+$a^{\mathrm T}_{i_1,i_2}$ and $A^{\mathrm T}$.
+For the two-dimensional case, the transpose operation is its own inverse.
+That is, $A = (A^{\mathrm T})^{\mathrm T}$.
+
+Eklundh~\cite{eklundh:ar72a} proposed an
+algorithm for matrix transposition for the case where the matrix could
+not fit entirely into main memory.  The matrix is assumed to be of
+dimension $2^n \times 2^n$.  Pairs of rows (alternatively, columns)
+are brought into memory, certain elements exchanged, and the rows then
+written out to secondary storage.  With this scheme only $2^{n+1}$
+elements would be in memory simultaneously, as opposed to the entire
+matrix of $2^{2n}$ elements.  The tradeoff here, of course, is speed,
+as O$(n \log n)$ row read/write operations to secondary storage would
+have to occur.
+
+Einstein~\cite{einstein} and Banach's book~\cite{banach-english} may
+also be relevant.
+
+Figure~\ref{eklalg.fig} is the algorithm.  The input to the
+algorithm is the matrix $X$\@.  The origin of the rows and columns of the
+matrix is zero.  The output is $X^{\mathrm T}$.  Let $m = 2^n$.  The outermost
+loop (starting at line~\ref{ekl.outfor.lin}) accomplishes the
+reverse-shuffles (line~\ref{ekl.revsh3.lin}) on
+the rows of $X$\@.  As this loop is executed $\log m$ times, the elements
+of $X$ return to their ``original position'' at the completion of the
+algorithm.  The loop starting at line~\ref{ekl.midfor.lin} implicitly
+brings pairs of
+rows into memory so that their corresponding elements can be swapped.  All
+$m$ rows are brought into memory during each iteration of the outermost
+loop.  Lines~\ref{ekl.revsh1.lin} and~\ref{ekl.revsh2.lin} reverse-shuffle
+the elements of the two rows
+just acted upon.  Again, each row has it elements reverse-shuffled $\log m$
+times.  The loop starting at line~\ref{ekl.infor.lin} swaps the appropriate
+elements
+between the two rows.  During iteration $i$, sub-matrices of size $2^{i+1}
+\times 2^{i+1}$ are transposed.
+
+\begin{figure}
+\centering
+\begin{pseudocode}
+\L{\K{for} $i$ := 0 \K{to} $n-1$ \K{do}\label{ekl.outfor.lin}}
+\L{   \K{for} $j$ := 0 \K{to} $2^{n-1}-1$ \K{do}\label{ekl.midfor.lin}}
+\L{      \K{for} $k$ := 0 \K{to} $2^{n-1}-1$ \K{ do}\label{ekl.infor.lin}}
+\L{         swap($X[2j,\ 2k+1],\ X[2j+1,\ 2k]$);}
+\L{      \K{endfor}\noline}
+\L{      reverse-shuffle the elements in row $2j$;\label{ekl.revsh1.lin}}
+\L{      reverse-shuffle the elements in row $2j+1$;\label{ekl.revsh2.lin}}
+\L{   \K{endfor}\noline}
+\L{   reverse-shuffle the rows in $X$;\label{ekl.revsh3.lin}}
+\L{\K{endfor}\noline}
+\end{pseudocode}
+\caption{Eklundh's Algorithm}
+\label{eklalg.fig}
+\end{figure}
+
+Eklundh's algorithm has been stated here in such a way so as to expose its
+parallelism.  One would be ill-advised in writing a serial program which
+implemented the algorithm in this manner.  Originally, indexing operations
+were used rather than the reverse-shuffles of the elements within their
+rows (lines~\ref{ekl.revsh1.lin} and~\ref{ekl.revsh2.lin} of
+Figure~\ref{eklalg.fig}).  Similarly, by bringing the correct pairs of rows
+into memory from secondary storage, the reverse-shuffle of
+line~\ref{ekl.revsh3.lin} was not necessary.
+
+\subsection{A figure and a table}
+
+In this subsection we present a figure and a table, just to show how
+it is done.  Don't waste too much time worrying about placement of
+figures and tables until the final draft.
+
+\begin{figure}
+%\centerline{\includegraphics{a.ps}}
+\caption{The Letter A}
+\label{lettera.fig}
+\end{figure}
+
+Table~\ref{summary.tab} is a summary of the reviewed transposition and
+rotation architectures.
+
+\begin{table}
+\tablecaption{Summary of Reviewed Transposers and Rotators}
+\label{summary.tab}
+\def\arraystretch{1.5}
+\small
+\hspace*{-22.75pt}\hbox{
+\begin{tabular}{|l|c|c|c|l|}
+   \hline
+   \multicolumn{1}{|c|}{\bf Method} & {\bf Area} & {\bf Time} & {$\bf AT^2$} &
+      \multicolumn{1}{c|}{\bf Comments} \\
+   & & (linear delay) & & \\
+   \hline
+   Perfect Shuffle & $\Theta(n^2 / \log^2 n)$ & O$(\log N \log^2 n)$ &
+      O$(n^2 \log^2 n \log^2 N)$ & Poor I/O \\
+   \hline
+   Atallah \& Kosaraju & O$(N^2 \log^2 N)$ & O$(N)$ & O$(N^4 \log^2 N)$ &
+   Transpose only \\
+   \hline
+   RAMAT & O$(N^2 \log^2 N)$ & O$(N \log N)$ & O$(N^4 \log^4 N)$ &
+   Transpose only \\
+   \hline
+   Gertner \& Shamash & O$(n^2)$ & O$(\log^2 n)$ & O$(n^2 \log^4 n)$ &
+   Optimized rotator \\
+   \hline
+   E-Network & O$(N^2 \log N)$ & O$(N \log^{3/2} N)$ & O$(N^4 \log^4 N)$ &
+   Transpose only \\
+   \hline
+   Chakrabarti \& J{\'a}J{\'a} & O$(N^{d+a+3i})$ & O$(N^{d/2-a} \log^2 n)$ &
+   O$(N^{2d+3i-a} \log^4 n)$ & Two rotators required \\
+   \hline
+   Owens \& J{\'a}J{\'a} & O$(N^2 \log^2 N)$ & O$(N)$ &
+   O$(N^4 \log^2 N)$ & Transpose only \\
+   \hline
+\end{tabular}}
+\end{table}
+
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "mythesis"
+%%% End: 

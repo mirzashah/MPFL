@@ -1,0 +1,237 @@
+\contentsline {chapter}{List of Tables}{x}
+\contentsline {chapter}{List of Figures}{xi}
+\contentsline {chapter}{Acknowledgments}{xiii}
+\contentsline {chapter}{\numberline {Chapter 1.}Introduction and Roadmap}{1}
+\contentsline {section}{\numberline {1.1}The Future is Autonomous}{1}
+\contentsline {section}{\numberline {1.2}Autonomy and Robotics}{1}
+\contentsline {subsection}{\numberline {1.2.1}Commercial and Research Autonomous Robots}{1}
+\contentsline {subsection}{\numberline {1.2.2}Military Autonomous Robots}{5}
+\contentsline {section}{\numberline {1.3}How Autonomous Robots Work}{8}
+\contentsline {subsection}{\numberline {1.3.1}Sensors, Actuators, and Payloads}{8}
+\contentsline {subsection}{\numberline {1.3.2}Data Fusion, Reasoning, and Perception}{9}
+\contentsline {subsection}{\numberline {1.3.3}Planning and Response}{11}
+\contentsline {subsubsection}{\numberline {1.3.3.1}Reactive versus Deliberative Planning}{12}
+\contentsline {subsection}{\numberline {1.3.4}Learning}{13}
+\contentsline {subsection}{\numberline {1.3.5}Putting it all Together}{13}
+\contentsline {section}{\numberline {1.4}The Development and Challenges of Mission Planning in Mobile Robots}{14}
+\contentsline {section}{\numberline {1.5}Roadmap}{15}
+\contentsline {chapter}{\numberline {Chapter 2.}Background Concepts}{16}
+\contentsline {section}{\numberline {2.1}The Relationship Between Computation and Artificial Intelligence}{16}
+\contentsline {section}{\numberline {2.2}The Relationship Between AI and Autonomy}{17}
+\contentsline {section}{\numberline {2.3}The Relationship Between Intelligence, Natural Languages, and Programming Languages}{18}
+\contentsline {section}{\numberline {2.4}The Relationship Between AI and Programming Languages}{19}
+\contentsline {subsection}{\numberline {2.4.1}Symbol Processing, Languages, and Semantics}{20}
+\contentsline {subsection}{\numberline {2.4.2}Knowledge Representation as Types}{20}
+\contentsline {subsubsection}{\numberline {2.4.2.1}Composite types and abstract data types}{21}
+\contentsline {subsubsection}{\numberline {2.4.2.2}Hierarchical Knowledge Representation Through Subtyping}{21}
+\contentsline {subsubsection}{\numberline {2.4.2.3}Reasoning Through Type Inferencing}{21}
+\contentsline {subsection}{\numberline {2.4.3}Hierarchical Error Handling through Exceptions}{22}
+\contentsline {subsection}{\numberline {2.4.4}The Power of Abstraction - Sapir-Whorf Revisited}{22}
+\contentsline {section}{\numberline {2.5}The Relationship Between AI and Domain-Specificity}{23}
+\contentsline {section}{\numberline {2.6}The Relationship Between AI and Domain-Specific Programming Languages}{24}
+\contentsline {subsection}{\numberline {2.6.1}Libraries versus Domain-Specific Languages}{26}
+\contentsline {subsection}{\numberline {2.6.2}Looking at Software Development as a Programming Language Design Problem}{26}
+\contentsline {section}{\numberline {2.7}The Relationship between Intelligence, Planning, and Scheduling}{27}
+\contentsline {section}{\numberline {2.8}Planning as Processes}{28}
+\contentsline {subsection}{\numberline {2.8.1}Processes and Operating Systems}{28}
+\contentsline {subsection}{\numberline {2.8.2}Modeling Planning in Terms of Processes}{29}
+\contentsline {subsection}{\numberline {2.8.3}Processes and Programming Language Semantics}{30}
+\contentsline {section}{\numberline {2.9}Segue: The Big Picture}{30}
+\contentsline {chapter}{\numberline {Chapter 3.}Overview of the Modular Planning Language and Framework}{31}
+\contentsline {section}{\numberline {3.1}Redundancies in Autonomy Development}{31}
+\contentsline {section}{\numberline {3.2}Overview of the Modular Planning Framework and Language}{32}
+\contentsline {subsection}{\numberline {3.2.1}Planning is to Schedules as Compiling is to Machine Code}{32}
+\contentsline {subsection}{\numberline {3.2.2}Expressiveness of the Mission Specification Language}{34}
+\contentsline {subsection}{\numberline {3.2.3}Customization and Reusability Via Plugins}{35}
+\contentsline {subsection}{\numberline {3.2.4}A Software Framework}{36}
+\contentsline {section}{\numberline {3.3}Segue: A Language of Planning}{37}
+\contentsline {chapter}{\numberline {Chapter 4.}A Language of Planning}{38}
+\contentsline {section}{\numberline {4.1}The Requirements of a Language for Planning}{38}
+\contentsline {section}{\numberline {4.2}The MPFL Mission Specification Language}{39}
+\contentsline {subsection}{\numberline {4.2.1}Language Overview}{39}
+\contentsline {subsection}{\numberline {4.2.2}Plans and Plan Instances}{40}
+\contentsline {subsubsection}{\numberline {4.2.2.1}Plan is a Type}{40}
+\contentsline {subsubsection}{\numberline {4.2.2.2}Plan Instance Constructors and Other Types}{41}
+\contentsline {subsubsection}{\numberline {4.2.2.3}Explicit Parameter Naming and Unit Specification}{43}
+\contentsline {subsection}{\numberline {4.2.3}User-defined Plans}{45}
+\contentsline {subsubsection}{\numberline {4.2.3.1}User-defined Plan Syntax}{45}
+\contentsline {subsubsection}{\numberline {4.2.3.2}Do Expression and Plan Operators}{46}
+\contentsline {subsubsection}{\numberline {4.2.3.3}Creating Plan Instances from User-Defined Plans}{48}
+\contentsline {subsubsection}{\numberline {4.2.3.4}The Sortie Plan Instance and Children Plan Instances}{49}
+\contentsline {subsubsection}{\numberline {4.2.3.5}Multiple Instances of User-Defined Plans}{50}
+\contentsline {subsubsection}{\numberline {4.2.3.6}Circular Dependencies}{50}
+\contentsline {subsection}{\numberline {4.2.4}Run-time Value Lookups}{50}
+\contentsline {subsubsection}{\numberline {4.2.4.1}An Important Note on the Safety of Lookup Calls}{51}
+\contentsline {subsection}{\numberline {4.2.5}Conditional Expressions}{51}
+\contentsline {subsubsection}{\numberline {4.2.5.1}Meaning of Conditional Expression}{52}
+\contentsline {subsubsection}{\numberline {4.2.5.2}Fluctuation of Condition}{53}
+\contentsline {subsubsection}{\numberline {4.2.5.3}Defining the Condition}{53}
+\contentsline {subsubsection}{\numberline {4.2.5.4}Pitfalls of Conditional Expressions}{53}
+\contentsline {subsection}{\numberline {4.2.6}Declaring and Binding Constraints}{54}
+\contentsline {subsubsection}{\numberline {4.2.6.1}Meaning of a Constraint}{55}
+\contentsline {subsubsection}{\numberline {4.2.6.2}Binding to an Entire Subexpression}{55}
+\contentsline {subsubsection}{\numberline {4.2.6.3}Binding Multiple Constraints and Constraint Intersection}{56}
+\contentsline {subsubsection}{\numberline {4.2.6.4}Constraints are Hierarchical}{56}
+\contentsline {subsection}{\numberline {4.2.7}Handling Errors: Infeasibilities and Conflicts}{57}
+\contentsline {subsubsection}{\numberline {4.2.7.1}Infeasibility Errors}{57}
+\contentsline {subsubsection}{\numberline {4.2.7.2}Conflict Errors}{57}
+\contentsline {subsubsection}{\numberline {4.2.7.3}Graceful Degradation and Exception Handling}{57}
+\contentsline {subsubsection}{\numberline {4.2.7.4}Infeasible and Conflict Handlers}{58}
+\contentsline {subsubsection}{\numberline {4.2.7.5}Handlers Are Hierarchical}{60}
+\contentsline {subsubsection}{\numberline {4.2.7.6}Case Signature Matching and Plan Instance Chains}{61}
+\contentsline {section}{\numberline {4.3}Segue: Making it Work}{64}
+\contentsline {chapter}{\numberline {Chapter 5.}Understanding and Utilizing MPFL}{66}
+\contentsline {section}{\numberline {5.1}Overview}{66}
+\contentsline {section}{\numberline {5.2}How MPFL is Meant to Be Used}{66}
+\contentsline {section}{\numberline {5.3}The Simplified MPFL Compiler/Runtime Engine}{67}
+\contentsline {section}{\numberline {5.4}Parser}{68}
+\contentsline {subsection}{\numberline {5.4.1}Grammar Specification}{68}
+\contentsline {subsection}{\numberline {5.4.2}Syntactic Enforcement of Types}{72}
+\contentsline {section}{\numberline {5.5}Plan Instance Tree (PIT) Builder}{73}
+\contentsline {subsection}{\numberline {5.5.1}Static Semantics}{73}
+\contentsline {subsection}{\numberline {5.5.2}Intermediate Representation - Plan Instance Tree}{74}
+\contentsline {subsection}{\numberline {5.5.3}Formal Specification of Type Rules}{78}
+\contentsline {subsection}{\numberline {5.5.4}Formal Specification of Run-time Type Rules}{79}
+\contentsline {subsection}{\numberline {5.5.5}The Next Step}{80}
+\contentsline {section}{\numberline {5.6}Lifetime State Transition (LST) Evaluator}{80}
+\contentsline {subsection}{\numberline {5.6.1}Lifetime State}{81}
+\contentsline {subsection}{\numberline {5.6.2}Usage of Lifetime State and the MPFL Model of Planning}{82}
+\contentsline {subsection}{\numberline {5.6.3}The Lifetime State Transition Evaluator}{82}
+\contentsline {subsection}{\numberline {5.6.4}LST Transition Rules}{83}
+\contentsline {subsection}{\numberline {5.6.5}Formal Semantics of LST Evaluator}{85}
+\contentsline {subsubsection}{\numberline {5.6.5.1}\texttt {Value} Evaluator (Partial Set of Rules)}{87}
+\contentsline {subsubsection}{\numberline {5.6.5.2}\texttt {ChangeOnState} Evaluator (Complete Set of Rules)}{87}
+\contentsline {subsubsection}{\numberline {5.6.5.3}\texttt {CurrentSerial} Evaluator (Complete Set of Rules)}{88}
+\contentsline {subsubsection}{\numberline {5.6.5.4}\texttt {CurrentXor} Evaluator (Complete Set of Rules)}{88}
+\contentsline {subsubsection}{\numberline {5.6.5.5}\texttt {Current} Evaluator (Complete Set of Rules)}{89}
+\contentsline {subsubsection}{\numberline {5.6.5.6}\texttt {NextSerial} Evaluator (Complete Set of Rules)}{89}
+\contentsline {subsubsection}{\numberline {5.6.5.7}\texttt {NextXor} Evaluator (Complete Set of Rules)}{91}
+\contentsline {subsubsection}{\numberline {5.6.5.8}\texttt {LST} Evaluator (Complete Set of Rules)}{93}
+\contentsline {subsection}{\numberline {5.6.6}Purpose of Formal Specification}{94}
+\contentsline {section}{\numberline {5.7}Planner Invocation (PI) Evaluator}{95}
+\contentsline {subsection}{\numberline {5.7.1}Plugins and Initialization}{95}
+\contentsline {subsection}{\numberline {5.7.2}Knowledge Base}{96}
+\contentsline {subsubsection}{\numberline {5.7.2.1}Formal Semantics of Lookup Calls}{96}
+\contentsline {subsection}{\numberline {5.7.3}Planners}{97}
+\contentsline {subsection}{\numberline {5.7.4}Planners and the MSL}{97}
+\contentsline {subsection}{\numberline {5.7.5}Planner Graph}{98}
+\contentsline {subsection}{\numberline {5.7.6}Planner Isolation and Component Reusability}{98}
+\contentsline {subsection}{\numberline {5.7.7}The Planner API}{98}
+\contentsline {subsubsection}{\numberline {5.7.7.1}The Class \texttt {planInstance}}{99}
+\contentsline {subsubsection}{\numberline {5.7.7.2}The Class \texttt {planner}}{101}
+\contentsline {subsection}{\numberline {5.7.8}The PI Evaluator Algorithm}{101}
+\contentsline {subsubsection}{\numberline {5.7.8.1}Top-Down Traversal}{102}
+\contentsline {subsubsection}{\numberline {5.7.8.2}Bottom-Up Traversal}{103}
+\contentsline {subsection}{\numberline {5.7.9}Schedules and Verification}{104}
+\contentsline {section}{\numberline {5.8}Putting it All Together - The Basic MPFL Compiler engine}{104}
+\contentsline {section}{\numberline {5.9}The Complete MPFL Compiler/Runtime Engine}{105}
+\contentsline {subsection}{\numberline {5.9.1}Planners Raise Exceptions}{105}
+\contentsline {subsection}{\numberline {5.9.2}Handling Errors via the Exception Handler (EH) Evaluator}{106}
+\contentsline {section}{\numberline {5.10}Replanning As Recompilation}{107}
+\contentsline {section}{\numberline {5.11}Segue: Building an Autonomous Robot with MPFL}{107}
+\contentsline {chapter}{\numberline {Chapter 6.}A Complete Demonstration System}{108}
+\contentsline {section}{\numberline {6.1}Demonstration System Architecture}{108}
+\contentsline {section}{\numberline {6.2}Demo Client Application}{108}
+\contentsline {section}{\numberline {6.3}AUV Simulator and Map Display}{109}
+\contentsline {section}{\numberline {6.4}The Planner Hierarchy}{110}
+\contentsline {section}{\numberline {6.5}Demo \texttt {UseAutopilot} Planner}{110}
+\contentsline {subsection}{\numberline {6.5.1}Callback \texttt {on\_ready\_to\_running}}{111}
+\contentsline {subsection}{\numberline {6.5.2}Callback \texttt {on\_forcerun\_to\_running}}{111}
+\contentsline {subsection}{\numberline {6.5.3}Callback \texttt {on\_running\_to\_complete}}{111}
+\contentsline {subsection}{\numberline {6.5.4}Callback \texttt {on\_ask\_for\_subproblems}}{111}
+\contentsline {subsection}{\numberline {6.5.5}Schedule Encoding}{111}
+\contentsline {subsection}{\numberline {6.5.6}Callback \texttt {build\_schedule}}{112}
+\contentsline {subsubsection}{\numberline {6.5.6.1}Representing and Rating a Solution}{112}
+\contentsline {subsubsection}{\numberline {6.5.6.2}Comparing Solutions}{113}
+\contentsline {subsubsection}{\numberline {6.5.6.3}Finding the Solution - Genetic Algorithm}{113}
+\contentsline {subsubsection}{\numberline {6.5.6.4}Performance}{114}
+\contentsline {subsubsection}{\numberline {6.5.6.5}Failure to Converge}{114}
+\contentsline {subsubsection}{\numberline {6.5.6.6}Accounting for Blocked Instances}{114}
+\contentsline {subsubsection}{\numberline {6.5.6.7}Improvement over Time and Solution Caching}{114}
+\contentsline {section}{\numberline {6.6}Demo \texttt {Transit} Planner}{115}
+\contentsline {subsection}{\numberline {6.6.1}Callback \texttt {on\_ready\_to\_running}}{115}
+\contentsline {subsection}{\numberline {6.6.2}Callback \texttt {on\_forcerun\_to\_running}}{115}
+\contentsline {subsection}{\numberline {6.6.3}Callback \texttt {on\_running\_to\_complete}}{115}
+\contentsline {subsection}{\numberline {6.6.4}Callback \texttt {on\_ask\_for\_subproblems}}{115}
+\contentsline {subsection}{\numberline {6.6.5}Schedule Encoding}{116}
+\contentsline {subsection}{\numberline {6.6.6}Callback \texttt {build\_schedule}}{116}
+\contentsline {subsection}{\numberline {6.6.7}Performance}{116}
+\contentsline {section}{\numberline {6.7}Demo \texttt {Loiter} Planner}{116}
+\contentsline {subsection}{\numberline {6.7.1}Callback \texttt {on\_ready\_to\_running}}{116}
+\contentsline {subsection}{\numberline {6.7.2}Callback \texttt {on\_forcerun\_to\_running}}{116}
+\contentsline {subsection}{\numberline {6.7.3}Callback \texttt {on\_running\_to\_complete}}{116}
+\contentsline {subsection}{\numberline {6.7.4}Callback \texttt {on\_ask\_for\_subproblems}}{117}
+\contentsline {subsection}{\numberline {6.7.5}Schedule Encoding}{117}
+\contentsline {subsection}{\numberline {6.7.6}Callback \texttt {build\_schedule}}{117}
+\contentsline {section}{\numberline {6.8}Demo \texttt {UseAcoustic} Planner}{117}
+\contentsline {subsection}{\numberline {6.8.1}Callback \texttt {on\_ready\_to\_running}}{117}
+\contentsline {subsection}{\numberline {6.8.2}Callback \texttt {on\_forcerun\_to\_running}}{117}
+\contentsline {subsection}{\numberline {6.8.3}Callback \texttt {on\_running\_to\_complete}}{118}
+\contentsline {subsection}{\numberline {6.8.4}Callback \texttt {on\_ask\_for\_subproblems}}{118}
+\contentsline {subsection}{\numberline {6.8.5}Schedule Encoding}{118}
+\contentsline {subsection}{\numberline {6.8.6}Callback \texttt {build\_schedule}}{118}
+\contentsline {section}{\numberline {6.9}Demo \texttt {UseSonar} Planner}{118}
+\contentsline {subsection}{\numberline {6.9.1}Callback \texttt {on\_ready\_to\_running}}{119}
+\contentsline {subsection}{\numberline {6.9.2}Callback \texttt {on\_forcerun\_to\_running}}{119}
+\contentsline {subsection}{\numberline {6.9.3}Callback \texttt {on\_running\_to\_complete}}{119}
+\contentsline {subsection}{\numberline {6.9.4}Callback \texttt {on\_ask\_for\_subproblems}}{119}
+\contentsline {subsection}{\numberline {6.9.5}Schedule Encoding}{119}
+\contentsline {subsection}{\numberline {6.9.6}Callback \texttt {build\_schedule}}{119}
+\contentsline {section}{\numberline {6.10}Demo \texttt {UseModem} Planner}{120}
+\contentsline {subsection}{\numberline {6.10.1}Callback \texttt {on\_ready\_to\_running}}{120}
+\contentsline {subsection}{\numberline {6.10.2}Callback \texttt {on\_forcerun\_to\_running}}{120}
+\contentsline {subsection}{\numberline {6.10.3}Callback \texttt {on\_running\_to\_complete}}{120}
+\contentsline {subsection}{\numberline {6.10.4}Callback \texttt {on\_ask\_for\_subproblems}}{120}
+\contentsline {subsection}{\numberline {6.10.5}Schedule Encoding}{120}
+\contentsline {subsection}{\numberline {6.10.6}Callback \texttt {build\_schedule}}{121}
+\contentsline {section}{\numberline {6.11}Demo \texttt {PhoneHome} Planner}{121}
+\contentsline {subsection}{\numberline {6.11.1}Callback \texttt {on\_ready\_to\_running}}{121}
+\contentsline {subsection}{\numberline {6.11.2}Callback \texttt {on\_forcerun\_to\_running}}{121}
+\contentsline {subsection}{\numberline {6.11.3}Callback \texttt {on\_running\_to\_complete}}{121}
+\contentsline {subsection}{\numberline {6.11.4}Callback \texttt {on\_ask\_for\_subproblems}}{121}
+\contentsline {subsection}{\numberline {6.11.5}Schedule Encoding}{121}
+\contentsline {subsection}{\numberline {6.11.6}Callback \texttt {build\_schedule}}{122}
+\contentsline {section}{\numberline {6.12}Demo \texttt {Search} Planner}{122}
+\contentsline {subsection}{\numberline {6.12.1}Callback \texttt {on\_ready\_to\_running}}{122}
+\contentsline {subsection}{\numberline {6.12.2}Callback \texttt {on\_forcerun\_to\_running}}{122}
+\contentsline {subsection}{\numberline {6.12.3}Callback \texttt {on\_running\_to\_complete}}{122}
+\contentsline {subsection}{\numberline {6.12.4}Callback \texttt {on\_ask\_for\_subproblems}}{122}
+\contentsline {subsection}{\numberline {6.12.5}Schedule Encoding}{123}
+\contentsline {subsection}{\numberline {6.12.6}Callback \texttt {build\_schedule}}{123}
+\contentsline {section}{\numberline {6.13}Segue: Results, Performance, and Related work}{124}
+\contentsline {chapter}{\numberline {Chapter 7.}Results, Related Work, Future Work}{125}
+\contentsline {section}{\numberline {7.1}Results}{125}
+\contentsline {subsection}{\numberline {7.1.1}Mission Performance}{125}
+\contentsline {subsection}{\numberline {7.1.2}Computational Performance}{125}
+\contentsline {subsection}{\numberline {7.1.3}Ease and Quality of API and Framework}{125}
+\contentsline {subsubsection}{\numberline {7.1.3.1}Simplicity}{126}
+\contentsline {subsubsection}{\numberline {7.1.3.2}Consistency}{127}
+\contentsline {subsubsection}{\numberline {7.1.3.3}Match Implementation Language Style}{127}
+\contentsline {subsubsection}{\numberline {7.1.3.4}Modular}{127}
+\contentsline {subsubsection}{\numberline {7.1.3.5}Documentation}{127}
+\contentsline {subsubsection}{\numberline {7.1.3.6}Verification and Feedback}{127}
+\contentsline {subsubsection}{\numberline {7.1.3.7}Default Behavior}{128}
+\contentsline {subsubsection}{\numberline {7.1.3.8}Isolation of API/Framework and End User Application}{128}
+\contentsline {section}{\numberline {7.2}Issues and Future Work}{128}
+\contentsline {subsection}{\numberline {7.2.1}Incomplete Features}{128}
+\contentsline {subsubsection}{\numberline {7.2.1.1}Power Constraint Enforcement}{128}
+\contentsline {subsubsection}{\numberline {7.2.1.2}Easily Swappable Planners}{129}
+\contentsline {subsection}{\numberline {7.2.2}Problems with Distributed Planning}{129}
+\contentsline {subsection}{\numberline {7.2.3}The Use of OCaml and Bindings for Other Languages}{130}
+\contentsline {subsection}{\numberline {7.2.4}Metalanguage}{131}
+\contentsline {subsection}{\numberline {7.2.5}Graphical Tool}{131}
+\contentsline {subsection}{\numberline {7.2.6}Enhancing MSL}{132}
+\contentsline {subsubsection}{\numberline {7.2.6.1}Syntax}{132}
+\contentsline {subsubsection}{\numberline {7.2.6.2}Primitive Plan Types}{132}
+\contentsline {subsubsection}{\numberline {7.2.6.3}Better Lookup Calls and More Built in Functions}{132}
+\contentsline {subsubsection}{\numberline {7.2.6.4}Variables and Functions}{133}
+\contentsline {subsection}{\numberline {7.2.7}Real Usage and System Tuning}{133}
+\contentsline {section}{\numberline {7.3}Related Work}{133}
+\contentsline {subsection}{\numberline {7.3.1}Planners}{133}
+\contentsline {subsection}{\numberline {7.3.2}Languages for Planning and Robotic Control}{134}
+\contentsline {subsection}{\numberline {7.3.3}Robotic Software Architectures}{134}
+\contentsline {subsubsection}{\numberline {7.3.3.1}Design Philosphy: Reactive, Deliberative, Hybrid}{135}
+\contentsline {subsubsection}{\numberline {7.3.3.2}Robotic ``Operating Systems''}{136}
+\contentsline {subsection}{\numberline {7.3.4}Cognitive Architectures}{137}
+\contentsline {section}{\numberline {7.4}Conclusion}{138}
+\contentsline {chapter}{Bibliography}{140}
